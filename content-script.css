@@ -1,0 +1,2 @@
+/* PromptDrawer host element. Everything visible lives inside its shadow root. */
+#promptdrawer-root{all:initial;position:fixed;inset:auto 0 0 auto;z-index:2147483000;pointer-events:none}
