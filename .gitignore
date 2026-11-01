@@ -1,0 +1,4 @@
+.extension-builder/
+node_modules/
+*.zip
+.DS_Store
