@@ -18,6 +18,7 @@ async function load() {
   $('#theme').value = settings.theme;
   $('#aboutMe').value = settings.aboutMe;
   $('#aboutMeAuto').checked = Boolean(settings.aboutMeAuto);
+  $('#projectOnInsert').checked = Boolean(settings.projectOnInsert);
   $('#engine').value = settings.engine;
   $('#byokProvider').value = settings.byokProvider;
   $('#byokModel').value = settings.byokModel;
@@ -38,6 +39,7 @@ async function save(patch) { settings = await updateSettings(patch); applyTheme(
 
 $('#showToolbar').addEventListener('change', e => save({ showToolbar: e.target.checked }));
 $('#theme').addEventListener('change', e => save({ theme: e.target.value }));
+$('#projectOnInsert').addEventListener('change', e => save({ projectOnInsert: e.target.checked }));
 $('#aboutMe').addEventListener('input', debounce(e => save({ aboutMe: e.target.value.slice(0, 2000) }), 400));
 $('#aboutMeAuto').addEventListener('change', async e => {
   if (e.target.checked && !(await isPro())) { e.target.checked = false; return alert('Auto-adding About me is a Pro feature. You can still write {{about_me}} inside any prompt for free.'); }

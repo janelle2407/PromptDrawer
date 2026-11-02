@@ -5,6 +5,7 @@
 - **Save** what you are typing with `Alt+S` (or the small toolbar, or the right-click menu).
 - **Insert** any saved prompt into the chat you have open. `{{blanks}}` get filled in as you go.
 - **Improve** a rough line with `Alt+I`: see a before/after diff, press *Use this*, and *Undo* if you change your mind. Works offline (instant structure), or asks the AI you are already talking to (free), or uses Chrome's on-device model or your own API key (Pro).
+- **Projects**: a reusable brief (context + instructions) that Improve folds into every rewrite, in every AI. One click to brief a new chat; `{{project}}` inside any saved prompt. Two free, unlimited with Pro.
 - **Ask all three**: send one prompt to every open AI tab and compare the answers (Pro).
 - **Folders, tags, favourites, search, version history, JSON/Markdown export**, three starter packs.
 - **No account, no server, no analytics.** Open source core (MIT). Pro is a one-time key.
@@ -27,7 +28,7 @@ Manifest V3, plain JavaScript modules, no build step.
 | `manifest.json` | Permissions: `storage`, `sidePanel`, `contextMenus`; host access only to the five chat sites. API providers are optional permissions asked for only when you add a key. |
 | `content-script.js` | Runs on the five chat sites. Finds the composer with a per-site adapter table plus a generic fallback, draws the toolbar/dialogs in a closed shadow root, never reads the conversation. |
 | `service-worker.js` | Routes keyboard commands, context menus and messages. Verifies every sender. Runs Improve. |
-| `side-panel.html` + `panel.js` | The drawer: Improve tab, My prompts, How to. |
+| `side-panel.html` + `panel.js` | The drawer: project picker, Improve tab, My prompts, How to. |
 | `welcome.html` + `welcome.js` | First-run page with a try-it box. |
 | `options.html` + `options.js` | Settings, About me, engines, licence. |
 | `lib/storage.js` | All data in `chrome.storage.local`. API keys live in a separate key so exports never include them. |

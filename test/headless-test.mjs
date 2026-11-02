@@ -33,7 +33,28 @@ try {
   await panel.selectOption('#imp-engine', 'inchat'); await panel.waitForTimeout(400);
   log('drawer Improve switches engine on change', /prompt engineer/.test(await panel.inputValue('#imp-out')) && (await panel.textContent('#imp-insert')).includes('Enter'));
   await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(300);
-  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 4);
+  // --- projects ---
+  await panel.selectOption('#project-select', '__new');
+  await panel.waitForSelector('#project-editor:not([hidden])', { timeout: 3000 });
+  await panel.fill('#pj-name', 'Poppiwink'); await panel.fill('#pj-context', 'A kids picture-book brand about a curious puppy.'); await panel.fill('#pj-instructions', 'Australian spelling. Keep it warm and short.');
+  await panel.click('#pj-save'); await panel.waitForSelector('#project-editor', { state: 'hidden' }); await panel.waitForTimeout(300);
+  const pjSettings = await panel.evaluate(() => chrome.storage.local.get(['projects', 'settings']));
+  log('project editor saves and activates the project', (pjSettings.projects || []).length === 1 && pjSettings.settings.activeProject === pjSettings.projects[0].id && (await panel.locator('#project-select option').count()) === 3);
+  await panel.fill('#imp-in', 'write a caption for the new book'); await panel.click('#imp-go'); await panel.waitForSelector('#imp-result:not([hidden])');
+  const pjOut = await panel.inputValue('#imp-out');
+  log('drawer Improve folds the project in (local engine)', /Project: Poppiwink/.test(pjOut) && /Australian spelling/.test(pjOut) && /Used project/.test(await panel.textContent('#imp-note')));
+  const pjInchat = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'write a caption', engine: 'inchat' }));
+  log('in-chat meta-prompt carries the project', pjInchat?.ok && /curious puppy/.test(pjInchat.improved) && pjInchat.usedProject === 'Poppiwink');
+  const filled = await panel.evaluate(() => import(chrome.runtime.getURL('lib/storage.js')).then(m => m.fillVariables('Hi {{project}} and {{about_me}} and {{x|y}}', {}, 'ME', 'BRIEF')));
+  log('{{project}} variable fills', filled === 'Hi BRIEF and ME and y');
+  await panel.click('#project-edit'); await panel.waitForSelector('#project-editor:not([hidden])');
+  log('edit button opens the active project', (await panel.inputValue('#pj-name')) === 'Poppiwink' && !(await panel.isHidden('#pj-delete')));
+  await panel.click('#pj-cancel');
+  await panel.selectOption('#project-select', ''); await panel.waitForTimeout(300);
+  await panel.click('#imp-go'); await panel.waitForTimeout(300);
+  log('"No project" switches it off again', !/Project: Poppiwink/.test(await panel.inputValue('#imp-out')) && (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.activeProject === '');
+  await panel.selectOption('#project-select', pjSettings.projects[0].id); await panel.waitForTimeout(200);
+  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 5);
   await panel.click('#tab-library');
   await panel.waitForSelector('#empty:not([hidden])', { timeout: 5000 });
   log('panel shows empty state with packs', (await panel.locator('#packs button').count()) === 3);
@@ -79,7 +100,7 @@ try {
   // export json
   const [download] = await Promise.all([panel.waitForEvent('download'), panel.click('#export-json')]);
   const path = await download.path(); const json = JSON.parse(fs.readFileSync(path, 'utf8'));
-  log('export json', json.prompts.length === 7 && !JSON.stringify(json).includes('byokKeys'));
+  log('export json includes projects, never keys', json.prompts.length === 7 && json.projects?.length === 1 && !JSON.stringify(json).includes('byokKeys'));
   // --- welcome page ---
   const welcome = await ctx.newPage(); welcome.on('pageerror', e => errors.push('welcome: ' + e.message));
   await welcome.goto(`chrome-extension://${id}/welcome.html`); await welcome.waitForSelector('#try-go');

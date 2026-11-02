@@ -21,6 +21,13 @@
   <button id="tab-help" role="tab" aria-selected="false" aria-controls="help">How to</button>
 </nav>
 
+<section id="project-bar" class="project-bar" aria-label="Project">
+  <label for="project-select">Project</label>
+  <select id="project-select" title="Improve and {{project}} use the project you pick here"><option value="">No project</option></select>
+  <button id="project-brief" type="button" class="small-btn" title="Put this project's context and instructions into the chat box, as the first message of a new chat">Brief the AI</button>
+  <button id="project-edit" type="button" class="icon" title="Edit this project" aria-label="Edit this project">✎</button>
+</section>
+
 <section id="improve" class="improve" aria-label="Improve a prompt">
   <p class="lead">Type a rough request. PromptDrawer turns it into a prompt the AI can act on well.</p>
   <label for="imp-in">Your rough request</label>
@@ -56,6 +63,7 @@
     <li><strong>Type something rough</strong> in the chat box. Then press <kbd>Alt</kbd>+<kbd>I</kbd> or click <strong>Improve</strong> on the pill. Check the result, press <strong>Use this</strong>.</li>
     <li><strong>Keep the good ones:</strong> press <kbd>Alt</kbd>+<kbd>S</kbd> to save what you typed. Find it later under <strong>My prompts</strong> and press <strong>Insert</strong>.</li>
     <li><strong>No AI tab open?</strong> Use the <strong>Improve</strong> tab here in the drawer, then Copy.</li>
+    <li><strong>Working on something bigger?</strong> Make a <strong>Project</strong> (top of the drawer): who it is for, what it is, how the AI should work. Pick it and every Improve knows the background. <strong>Brief the AI</strong> drops the whole thing into a fresh chat; <code>{{project}}</code> drops it into any saved prompt.</li>
   </ol>
   <p class="hint">Want real AI rewriting rather than a tidy-up? Pick "Ask the AI in this chat" (free) or add your own API key in Settings (⚙).</p>
   <div class="row-btns"><button id="help-welcome" type="button">Open the welcome page</button><button id="help-settings" type="button">Settings</button></div>
@@ -89,7 +97,7 @@
   </div>
   <label for="e-body">Prompt</label>
   <textarea id="e-body" spellcheck="true"></textarea>
-  <p class="hint">Use <code>{{name}}</code> for a blank to fill in each time, <code>{{name|default}}</code> for a default, and <code>{{about_me}}</code> for your About me block.</p>
+  <p class="hint">Use <code>{{name}}</code> for a blank to fill in each time, <code>{{name|default}}</code> for a default, <code>{{about_me}}</code> for your About me block, and <code>{{project}}</code> for the project you have picked.</p>
   <div class="actions">
     <button id="e-delete" class="danger" type="button" hidden>Delete</button>
     <span class="spacer"></span>
@@ -97,6 +105,23 @@
     <button id="e-save" class="primary" type="button">Save</button>
   </div>
   <details id="versions" class="versions" hidden><summary>Version history</summary><ul id="version-list"></ul></details>
+</section>
+
+<section id="project-editor" class="editor" hidden aria-label="Edit project">
+  <h2 id="project-editor-title">New project</h2>
+  <p class="hint">A project is a reusable brief. Pick it at the top of the drawer and Improve, Alt+I and <code>{{project}}</code> all know the background. Works the same in every AI.</p>
+  <label for="pj-name">Name</label><input id="pj-name" maxlength="60" placeholder="e.g. Poppiwink, Gift List Keeper, My thesis">
+  <label for="pj-context">Context: what the AI should know about this project</label>
+  <textarea id="pj-context" spellcheck="true" placeholder="What it is, who it is for, tone, products, names, links, anything you keep re-explaining…"></textarea>
+  <label for="pj-instructions">Instructions: how the AI should work on it</label>
+  <textarea id="pj-instructions" spellcheck="true" placeholder="e.g. Keep answers short. Australian spelling. Never invent prices. Ask before assuming the audience…"></textarea>
+  <p id="pj-count" class="meta"></p>
+  <div class="actions">
+    <button id="pj-delete" class="danger" type="button" hidden>Delete</button>
+    <span class="spacer"></span>
+    <button id="pj-cancel" type="button">Cancel</button>
+    <button id="pj-save" class="primary" type="button">Save</button>
+  </div>
 </section>
 
 <footer class="bottom">

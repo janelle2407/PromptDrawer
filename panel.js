@@ -1,12 +1,13 @@
 // PromptDrawer side panel: the library.
-import { CHECKOUT_URL, PRO_FEATURES } from './config.js';
+import { CHECKOUT_URL, FREE_LIMITS, LIMITS, PRO_FEATURES } from './config.js';
 import { isPro } from './lib/license.js';
 import { STARTER_PACKS } from './lib/packs.js';
-import { deletePrompt, fillVariables, findVariables, getPrompts, getSettings, importPrompts, savePrompt, toMarkdown, uid } from './lib/storage.js';
+import { SPECIAL_VARIABLES, deletePrompt, deleteProject, fillVariables, findVariables, getProjects, getPrompts, getSettings, importProjects, importPrompts, projectBrief, savePrompt, saveProject, toMarkdown, uid, updateSettings } from './lib/storage.js';
 import { ENGINE_HELP } from './lib/improver.js';
 
 const $ = (sel) => document.querySelector(sel);
-const state = { prompts: [], settings: {}, pro: false, folder: 'all', query: '', editing: null, tab: 'improve', improved: null };
+const state = { prompts: [], projects: [], settings: {}, pro: false, folder: 'all', query: '', editing: null, editingProject: null, tab: 'improve', improved: null };
+const activeProject = () => state.projects.find(p => p.id === state.settings.activeProject) || null;
 
 const report = (text, tone = '') => { const s = $('#status'); s.textContent = text; s.dataset.tone = tone; if (text) setTimeout(() => { if (s.textContent === text) { s.textContent = ''; s.dataset.tone = ''; } }, 6000); };
 const applyTheme = () => { if (state.settings.theme === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = state.settings.theme; };
@@ -14,8 +15,9 @@ const send = async (message) => { try { return await chrome.runtime.sendMessage(
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function load() {
-  [state.prompts, state.settings, state.pro] = await Promise.all([getPrompts(), getSettings(), isPro()]);
+  [state.prompts, state.projects, state.settings, state.pro] = await Promise.all([getPrompts(), getProjects(), getSettings(), isPro()]);
   applyTheme();
+  renderProjectBar();
   $('#pro-badge').textContent = state.pro ? 'Pro' : 'Free';
   if (!state.loaded) {
     state.loaded = true;
@@ -90,9 +92,11 @@ async function addPack(pack) {
 
 // --- Variables -------------------------------------------------------------
 function withVariables(p, done) {
-  const vars = findVariables(p.body).filter(v => v.name !== 'about_me');
+  const vars = findVariables(p.body).filter(v => !SPECIAL_VARIABLES.includes(v.name));
   const aboutMe = state.settings.aboutMe || '';
-  if (!vars.length) return done(fillVariables(p.body, {}, aboutMe));
+  const brief = projectBrief(activeProject());
+  const finish = (text) => done(withProjectOnInsert(text, p.body, brief));
+  if (!vars.length) return finish(fillVariables(p.body, {}, aboutMe, brief));
   modal('Fill in the blanks', box => {
     const inputs = {};
     for (const v of vars) {
@@ -102,10 +106,17 @@ function withVariables(p, done) {
       box.append(label, input);
     }
     const actions = document.createElement('div'); actions.className = 'actions';
-    const cancel = button('Cancel', closeModal); const ok = button('Continue', () => { const values = {}; for (const [k, i] of Object.entries(inputs)) values[k] = i.value; closeModal(); done(fillVariables(p.body, values, aboutMe)); }, 'primary');
+    const cancel = button('Cancel', closeModal); const ok = button('Continue', () => { const values = {}; for (const [k, i] of Object.entries(inputs)) values[k] = i.value; closeModal(); finish(fillVariables(p.body, values, aboutMe, brief)); }, 'primary');
     actions.append(spacer(), cancel, ok); box.append(actions);
     box.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') ok.click(); });
   });
+}
+
+// Optional setting: put the project brief in front of every inserted prompt
+// that does not already pull it in with {{project}}.
+function withProjectOnInsert(text, rawBody, brief) {
+  if (!brief || !state.settings.projectOnInsert || /\{\{\s*project\s*(\|[^}]*)?\}\}/.test(rawBody || '')) return text;
+  return brief + '\n\n' + text;
 }
 
 async function insertPrompt(p) {
@@ -187,7 +198,7 @@ function openEditor(p) {
     li.append(when, pre, button('Restore this version', () => { $('#e-body').value = v.body; report('Restored into the editor. Press Save to keep it.'); }));
     vl.append(li);
   }
-  for (const id of ['improve', 'library', 'help', 'quick']) $('#' + id).hidden = true;
+  for (const id of ['improve', 'library', 'help', 'quick', 'project-editor']) $('#' + id).hidden = true;
   $('#editor').hidden = false; $('#e-title').focus();
 }
 function closeEditor() { state.editing = null; $('#editor').hidden = true; showTab(state.tab); }
@@ -227,11 +238,73 @@ function showTab(id) {
   try { localStorage.setItem('pd-tab', id); } catch { /* ignore */ }
   for (const t of ['improve', 'library', 'help']) { $('#' + t).hidden = t !== id; $('#tab-' + t).setAttribute('aria-selected', String(t === id)); }
   $('#quick').hidden = id !== 'library';
-  $('#editor').hidden = true;
+  $('#editor').hidden = true; $('#project-editor').hidden = true; $('#project-bar').hidden = id === 'help';
 }
 for (const t of ['improve', 'library', 'help']) $('#tab-' + t).addEventListener('click', () => showTab(t));
 $('#help-welcome').addEventListener('click', () => send({ type: 'pd:open-welcome' }));
 $('#help-settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+// --- Projects ---------------------------------------------------------------
+function renderProjectBar() {
+  const select = $('#project-select'); const current = state.settings.activeProject || '';
+  select.replaceChildren();
+  const none = document.createElement('option'); none.value = ''; none.textContent = state.projects.length ? 'No project' : 'No project yet'; select.append(none);
+  for (const p of state.projects) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; select.append(o); }
+  const add = document.createElement('option'); add.value = '__new'; add.textContent = '+ New project…'; select.append(add);
+  select.value = state.projects.some(p => p.id === current) ? current : '';
+  const active = activeProject();
+  $('#project-bar').dataset.active = String(Boolean(active));
+  $('#project-brief').hidden = !active; $('#project-edit').hidden = !active;
+}
+$('#project-select').addEventListener('change', async e => {
+  const value = e.target.value;
+  if (value === '__new') { e.target.value = state.settings.activeProject || ''; return openProjectEditor(null); }
+  await updateSettings({ activeProject: value });
+  const p = state.projects.find(x => x.id === value);
+  report(p ? `Improve will use "${p.name}" from now on.` : 'No project in use.', 'ok');
+});
+$('#project-edit').addEventListener('click', () => { const p = activeProject(); if (p) openProjectEditor(p); });
+$('#project-brief').addEventListener('click', async () => {
+  const brief = projectBrief(activeProject()); if (!brief) return;
+  const text = brief + '\n\nPlease keep all of this in mind for the rest of our chat. Reply with "Got it" and one line on what you understood.';
+  const result = await send({ type: 'pd:insert-active', text, replace: false });
+  if (result?.ok) report(`Project brief put into ${result.site}. Press Enter there to start the chat.`, 'ok');
+  else if (result?.error === 'not-ai-tab') { await navigator.clipboard.writeText(text); report('Copied the project brief. Paste it as the first message of a new chat.', ''); }
+  else if (result?.error === 'reload-tab') report('Reload the chat tab once, then try again.', 'error');
+  else { await navigator.clipboard.writeText(text); report('Could not write into that chat box, so the brief was copied instead.', 'error'); }
+});
+function openProjectEditor(p) {
+  if (!p && !state.pro && state.projects.length >= FREE_LIMITS.projects) return upsell(`${PRO_FEATURES.projects} (the free plan includes ${FREE_LIMITS.projects})`);
+  state.editingProject = p ? { ...p } : { id: null, name: '', context: '', instructions: '' };
+  $('#project-editor-title').textContent = p ? 'Edit project' : 'New project';
+  $('#pj-name').value = state.editingProject.name; $('#pj-context').value = state.editingProject.context; $('#pj-instructions').value = state.editingProject.instructions;
+  $('#pj-delete').hidden = !p; projectCount();
+  for (const id of ['improve', 'library', 'help', 'quick', 'editor']) $('#' + id).hidden = true;
+  $('#project-editor').hidden = false; $('#pj-name').focus();
+}
+function closeProjectEditor() { state.editingProject = null; $('#project-editor').hidden = true; showTab(state.tab); }
+function projectCount() { const n = ($('#pj-context').value.length + $('#pj-instructions').value.length); $('#pj-count').textContent = n ? `${n.toLocaleString()} characters (roughly ${Math.round(n / 4).toLocaleString()} tokens each time it is used)` : ''; }
+$('#pj-context').addEventListener('input', projectCount); $('#pj-instructions').addEventListener('input', projectCount);
+$('#pj-save').addEventListener('click', async () => {
+  const name = $('#pj-name').value.trim(); const context = $('#pj-context').value.trim(); const instructions = $('#pj-instructions').value.trim();
+  if (!name) return report('Give the project a name first.', 'error');
+  if (!context && !instructions) return report('Add some context or instructions, otherwise there is nothing for the AI to use.', 'error');
+  try {
+    const saved = await saveProject({ id: state.editingProject.id || undefined, name, context, instructions }, { max: state.pro ? LIMITS.projects : FREE_LIMITS.projects });
+    await updateSettings({ activeProject: saved.id });
+    closeProjectEditor(); report(`Saved. Improve will use "${saved.name}" from now on.`, 'ok'); await load();
+  } catch (error) { report(error.message === 'project-limit' ? 'Project limit reached.' : 'Could not save: ' + error.message, 'error'); }
+});
+$('#pj-cancel').addEventListener('click', closeProjectEditor);
+$('#pj-delete').addEventListener('click', () => {
+  if (!state.editingProject?.id) return;
+  modal('Delete this project?', box => {
+    const p = document.createElement('p'); p.textContent = `"${state.editingProject.name}" will be removed from this device. Saved prompts are not affected.`; box.append(p);
+    const actions = document.createElement('div'); actions.className = 'actions';
+    actions.append(button('Keep it', closeModal), spacer(), button('Delete', async () => { await deleteProject(state.editingProject.id); closeModal(); closeProjectEditor(); report('Project deleted.'); await load(); }, 'danger'));
+    box.append(actions);
+  });
+});
 
 // --- Improve (inside the drawer, works without any AI tab) ------------------
 const engineHelp = () => { $('#imp-help').textContent = ENGINE_HELP[$('#imp-engine').value] || ''; };
@@ -253,7 +326,8 @@ async function runImprove() {
   state.improved = result;
   $('#imp-result').hidden = false;
   $('#imp-out').value = result.improved;
-  const note = $('#imp-note'); note.hidden = !result.note; note.textContent = result.note || '';
+  const noteText = [result.note || '', result.usedProject ? `Used project "${result.usedProject}".` : ''].filter(Boolean).join(' ');
+  const note = $('#imp-note'); note.hidden = !noteText; note.textContent = noteText;
   const diff = $('#imp-diff'); diff.replaceChildren();
   for (const part of result.diff || [{ type: 'same', text: result.improved }]) {
     const node = part.type === 'add' ? document.createElement('ins') : part.type === 'del' ? document.createElement('del') : document.createElement('span');
@@ -290,7 +364,7 @@ function download(name, text, type) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 const stamp = () => new Date().toISOString().slice(0, 10);
-$('#export-json').addEventListener('click', () => { download(`promptdrawer-${stamp()}.json`, JSON.stringify({ app: 'PromptDrawer', version: 1, exportedAt: new Date().toISOString(), prompts: state.prompts }, null, 2), 'application/json'); report('Exported. API keys are never included.', 'ok'); });
+$('#export-json').addEventListener('click', () => { download(`promptdrawer-${stamp()}.json`, JSON.stringify({ app: 'PromptDrawer', version: 2, exportedAt: new Date().toISOString(), prompts: state.prompts, projects: state.projects }, null, 2), 'application/json'); report('Exported. API keys are never included.', 'ok'); });
 $('#export-md').addEventListener('click', () => { if (!state.pro) return upsell(PRO_FEATURES.markdownExport); download(`promptdrawer-${stamp()}.md`, toMarkdown(state.prompts), 'text/markdown'); });
 $('#import').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', async e => {
@@ -300,7 +374,8 @@ $('#import-file').addEventListener('change', async e => {
     const list = Array.isArray(data) ? data : data.prompts;
     if (!Array.isArray(list)) throw new Error('not a PromptDrawer export');
     const result = await importPrompts(list);
-    report(`Imported ${result.added} new, updated ${result.updated}.`, 'ok'); await load();
+    const projects = Array.isArray(data.projects) ? await importProjects(data.projects) : { added: 0, updated: 0 };
+    report(`Imported ${result.added} new prompts, updated ${result.updated}${projects.added || projects.updated ? `, plus ${projects.added + projects.updated} project(s)` : ''}.`, 'ok'); await load();
   } catch (error) { report('Could not import: ' + error.message, 'error'); }
   e.target.value = '';
 });
@@ -321,5 +396,5 @@ function closeModal() { $('#modal-root').replaceChildren(); }
 function button(text, onClick, cls = '') { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; if (cls) b.className = cls; b.addEventListener('click', onClick); return b; }
 function spacer() { const s = document.createElement('span'); s.className = 'spacer'; return s; }
 
-chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && (changes.prompts || changes.settings || changes.license)) load(); });
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && (changes.prompts || changes.projects || changes.settings || changes.license)) load(); });
 load();
