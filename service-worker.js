@@ -148,7 +148,7 @@ async function insertActive(message) {
   if (!tab) return { ok: false, error: 'not-ai-tab' };
   try {
     const result = await chrome.tabs.sendMessage(tab.id, { type: 'pd:insert', text: String(message.text || ''), send: Boolean(message.send), replace: message.replace !== false });
-    return { ok: Boolean(result?.ok), error: result?.error, site: siteFor(tab.url)?.name };
+    return { ok: Boolean(result?.ok), error: result?.error, guessed: Boolean(result?.guessed), site: siteFor(tab.url)?.name };
   } catch { return { ok: false, error: 'reload-tab', site: siteFor(tab.url)?.name }; }
 }
 

@@ -19,6 +19,8 @@
 
 Shortcuts can be changed at `chrome://extensions/shortcuts`.
 
+Two chat boxes on one page (for example Claude's project chat next to a thread)? PromptDrawer writes into the box you are in or used last. Click in the one you want first.
+
 ## How it is built
 
 Manifest V3, plain JavaScript modules, no build step.

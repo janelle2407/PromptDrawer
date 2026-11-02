@@ -159,6 +159,25 @@ try {
   const all = await panel.evaluate(() => chrome.storage.local.get('prompts'));
   const fromPage = (all.prompts || []).find(p => p.body.includes('Appended line'));
   log('Alt+S save from page lands in storage with source', Boolean(fromPage) && fromPage.source === 'ChatGPT', JSON.stringify(fromPage && { title: fromPage.title, source: fromPage.source }));
+  // --- two chat boxes side by side (claude.ai project chat + thread) ---
+  const claudeHtml = `<!doctype html><html><body><div id="left" class="ProseMirror" contenteditable="true"><p><br></p></div><div id="right" class="ProseMirror" contenteditable="true"><p><br></p></div><script>
+    for (const ed of document.querySelectorAll('.ProseMirror')) ed.addEventListener('paste',e=>{e.preventDefault();const t=e.clipboardData.getData('text/plain');const html=t.replace(/^\\n/,'').split('\\n').map(l=>'<p>'+(l||'<br>')+'</p>').join('');ed.innerHTML=html;});</script></body></html>`;
+  await ctx.route('https://claude.ai/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: claudeHtml }));
+  const claude = await ctx.newPage(); claude.on('pageerror', e => errors.push('claude: ' + e.message));
+  await claude.goto('https://claude.ai/'); await claude.waitForSelector('#promptdrawer-root', { state: 'attached', timeout: 8000 });
+  await claude.bringToFront();
+  const g1 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Hello thread', replace: true }));
+  const boxes1 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes, none used yet: insert goes to the last one and is flagged as a guess', g1?.ok && g1.guessed === true && boxes1[1].includes('Hello thread') && !boxes1[0].includes('Hello thread'), JSON.stringify([g1, boxes1]));
+  await claude.focus('#left'); await claude.waitForTimeout(100);
+  const g2 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Hello project', replace: true }));
+  const boxes2 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes: insert goes to the one you clicked in', g2?.ok && g2.guessed === false && boxes2[0].includes('Hello project') && !boxes2[1].includes('Hello project'), JSON.stringify([g2, boxes2]));
+  await claude.evaluate(() => document.getElementById('left').blur());
+  const g3 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Still project', replace: true }));
+  const boxes3 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes: after clicking away, insert still goes to the one used last', g3?.ok && boxes3[0].includes('Still project') && !boxes3[1].includes('Still project'), JSON.stringify([g3, boxes3]));
+  await claude.close();
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
   await ctx.unroute('https://chatgpt.com/**');

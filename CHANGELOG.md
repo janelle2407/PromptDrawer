@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-11-02)
+
+- Two chat boxes on one page (Claude's project chat beside a thread): inserts now go to the box you are in or used last, not the first one on the page. If neither has been used yet, PromptDrawer picks the last one and says so in the toast.
+
 ## 0.2.0 (2026-11-02)
 
 Projects: context and instructions that travel with you.
