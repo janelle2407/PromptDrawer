@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-11-02)
+
+- Improve now writes every prompt in the **CIDI** shape: Context, Instructions, Details, Input. Same four labels on all four engines (tidy-up, ask-the-AI, Chrome built-in AI, own key), so the structure is easy to learn and the AI gets a clear Input slot for the text or data to work from.
+
 ## 0.2.1 (2026-11-02)
 
 - Two chat boxes on one page (Claude's project chat beside a thread): inserts now go to the box you are in or used last, not the first one on the page. If neither has been used yet, PromptDrawer picks the last one and says so in the toast.

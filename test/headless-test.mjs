@@ -25,7 +25,8 @@ try {
   await panel.fill('#imp-in', 'write an email to my landlord about the broken heater');
   await panel.click('#imp-go');
   await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
-  log('drawer Improve produces a result', /Role:/.test(await panel.inputValue('#imp-out')));
+  const firstOut = await panel.inputValue('#imp-out');
+  log('drawer Improve produces a CIDI result', ['Context:', 'Instructions:', 'Details:', 'Input:'].every(l => firstOut.includes(l)) && firstOut.indexOf('Context:') < firstOut.indexOf('Instructions:') && firstOut.indexOf('Instructions:') < firstOut.indexOf('Details:') && firstOut.indexOf('Details:') < firstOut.indexOf('Input:'), JSON.stringify(firstOut.slice(0, 80)));
   await panel.click('#imp-save'); await panel.waitForTimeout(300);
   const savedFromImprove = await panel.evaluate(() => chrome.storage.local.get('prompts'));
   log('drawer Improve can save the result', (savedFromImprove.prompts || []).length === 1 && savedFromImprove.prompts[0].source === 'improve');
@@ -84,7 +85,7 @@ try {
   await panel.keyboard.press('Escape');
   // improve via SW message (local engine)
   const improved = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'write an email to my landlord about the broken heater, friendly' }));
-  log('improve local engine', improved?.ok && improved.mode === 'replace' && /Role:/.test(improved.improved) && improved.diff.length > 1, (improved?.improved || '').split('\n')[0]);
+  log('improve local engine', improved?.ok && improved.mode === 'replace' && /Context:/.test(improved.improved) && improved.diff.length > 1, (improved?.improved || '').split('\n')[0]);
   const inchat = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'plan a trip', engine: 'inchat' }));
   log('improve in-chat engine', inchat?.ok && inchat.mode === 'inchat' && /prompt engineer/.test(inchat.improved));
   const nano = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'plan a trip', engine: 'nano' }));
@@ -105,7 +106,7 @@ try {
   const welcome = await ctx.newPage(); welcome.on('pageerror', e => errors.push('welcome: ' + e.message));
   await welcome.goto(`chrome-extension://${id}/welcome.html`); await welcome.waitForSelector('#try-go');
   await welcome.click('#try-go'); await welcome.waitForSelector('#try-result:not([hidden])', { timeout: 5000 });
-  log('welcome page try-it box improves', /Role:/.test(await welcome.inputValue('#try-out')));
+  log('welcome page try-it box improves', /Context:/.test(await welcome.inputValue('#try-out')));
   await welcome.close();
   // --- options ---
   const opts = await ctx.newPage();
