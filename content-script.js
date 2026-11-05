@@ -12,6 +12,7 @@
     'www.perplexity.ai': { name: 'Perplexity', composer: ['#ask-input', 'div[contenteditable="true"][role="textbox"]', 'textarea[placeholder*="Ask" i]'], send: ['button[aria-label="Submit"]', 'button[data-testid="submit-button"]'] },
     'copilot.microsoft.com': { name: 'Copilot', composer: ['#userInput', 'textarea[data-testid="composer-input"]', 'div[contenteditable="true"][role="textbox"]', 'textarea[placeholder*="Message" i]'], send: ['button[aria-label="Submit message"]', 'button[data-testid="submit-button"]', 'button[aria-label="Send"]'] },
   };
+  ADAPTERS['copilot.com'] = ADAPTERS['copilot.microsoft.com']; // same app, newer hostname
   const adapter = ADAPTERS[location.hostname] || { name: location.hostname, composer: [], send: [] };
 
   // --- Composer access ----------------------------------------------------
@@ -276,6 +277,7 @@
     const settings = (await chrome.storage.local.get({ settings: {} }).catch(() => ({ settings: {} }))).settings || {};
     let engine = settings.engine || 'local';
     let current = null;
+    let gen = 0; // each run() gets a number; a reply from an older run is ignored
     const card = dialog('Improve prompt', card => {
       const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'How to improve it' });
       for (const [id, label] of ENGINES) seg.append(el('button', { text: label, 'aria-pressed': String(id === engine), 'data-engine': id, onclick: () => { engine = id; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === id))); help.textContent = ENGINE_HELP[id]; run(); } }));
@@ -303,7 +305,9 @@
     const run = async () => {
       const out = card.querySelector('#pd-out'), diff = card.querySelector('#pd-diff'), note = card.querySelector('#pd-note'), use = card.querySelector('#pd-use'), save = card.querySelector('#pd-save-improved'), toggle = card.querySelector('#pd-toggle');
       out.value = 'Improving…'; use.disabled = true; save.disabled = true; note.hidden = true; current = null;
+      const my = ++gen;
       const result = await send({ type: 'pd:improve', text: rough, engine });
+      if (my !== gen || !card.isConnected) return; // a newer engine was picked (or the dialog closed) while this ran
       if (!result?.ok) { out.value = 'Something went wrong: ' + (result?.error || 'no response') + '. Reload this tab and try again.'; return; }
       current = result;
       out.value = result.improved;
@@ -359,7 +363,8 @@
   // Keyboard fallback for when Chrome's command shortcuts are not bound.
   document.addEventListener('keydown', event => {
     if (!event.isTrusted || !event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
-    const key = event.key.toLowerCase();
+    // On macOS Option+letter puts a symbol in event.key ("ß", "ˆ", "∂"), so match the physical key first.
+    const key = ({ KeyS: 's', KeyI: 'i', KeyD: 'd' })[event.code] || String(event.key || '').toLowerCase();
     if (!['s', 'i', 'd'].includes(key)) return;
     const target = event.composedPath()[0];
     if (!editable(target)) return;
@@ -374,9 +379,14 @@
   }
   $('#tip-ok').addEventListener('click', markTipSeen);
   // Toolbar visibility follows the setting.
-  chrome.storage.local.get({ settings: {} }).then(({ settings }) => { $('#bar').hidden = settings?.showToolbar === false; $('#tip').hidden = settings?.showToolbar === false || Boolean(settings?.tipSeen); }).catch(() => {});
+  const applyToolbarSettings = (settings) => {
+    const hideBar = settings?.showToolbar === false;
+    $('#bar').hidden = hideBar;
+    $('#tip').hidden = hideBar || Boolean(settings?.tipSeen);
+  };
+  chrome.storage.local.get({ settings: {} }).then(({ settings }) => applyToolbarSettings(settings)).catch(() => {});
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.settings) $('#bar').hidden = changes.settings.newValue?.showToolbar === false;
+    if (area === 'local' && changes.settings) applyToolbarSettings(changes.settings.newValue);
   });
   // Some sites replace <body> during navigation; keep the host attached.
   new MutationObserver(() => { if (!root.isConnected) (document.body || document.documentElement).append(root); }).observe(document.documentElement, { childList: true });

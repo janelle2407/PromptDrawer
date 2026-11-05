@@ -316,11 +316,14 @@ async function grabTyping() {
   $('#imp-in').value = r.text; report(`Grabbed what you typed in ${r.site}.`, 'ok'); return true;
 }
 $('#imp-grab').addEventListener('click', grabTyping);
+let improveGen = 0; // each runImprove() gets a number; a reply from an older run is ignored
 async function runImprove() {
   const rough = $('#imp-in').value.trim();
   if (!rough) return report('Type a rough request first.', 'error');
   const go = $('#imp-go'); go.disabled = true; go.textContent = 'Improving…';
+  const my = ++improveGen;
   const result = await send({ type: 'pd:improve', text: rough, engine: $('#imp-engine').value });
+  if (my !== improveGen) return; // the engine changed while this ran; the newer run owns the UI
   go.disabled = false; go.textContent = 'Improve';
   if (!result?.ok) return report('Could not improve: ' + (result?.error || 'no response'), 'error');
   state.improved = result;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 (2026-11-05)
+
+Four fixes from the code review of the first test build.
+- **copilot.com** (Copilot's newer address) now gets the same chat-box and send-button selectors as copilot.microsoft.com, so inserts land in the right box and Send is found.
+- **Mac keyboard shortcuts**: Option+S / Option+I / Option+D type a symbol on macOS, so the page shortcut now matches the physical key. Works on every keyboard layout.
+- **Switching engines quickly** while an Improve is still running: a slow reply from the earlier engine no longer overwrites the newer one (Improve dialog on chat sites, and the drawer's Improve tab).
+- **Toolbar off in Settings** now hides the first-run tip as well as the pill, straight away.
+
 ## 0.2.2 (2026-11-02)
 
 - Improve now writes every prompt in the **CIDI** shape: Context, Instructions, Details, Input. Same four labels on all four engines (tidy-up, ask-the-AI, Chrome built-in AI, own key), so the structure is easy to learn and the AI gets a clear Input slot for the text or data to work from.
