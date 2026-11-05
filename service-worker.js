@@ -3,9 +3,9 @@
 import { PRO_FEATURES } from './config.js';
 import { wordDiff } from './lib/diff.js';
 import { improveWithByok, improveWithNano, nanoAvailability } from './lib/engines.js';
-import { buildMetaPrompt, localImprove } from './lib/improver.js';
+import { buildContext, buildMetaPrompt, localImprove } from './lib/improver.js';
 import { isPro } from './lib/license.js';
-import { bumpUse, getSettings, savePrompt, titleFrom } from './lib/storage.js';
+import { bumpUse, getActiveProject, getSettings, projectBrief, savePrompt, titleFrom } from './lib/storage.js';
 import { LIMITS } from './config.js';
 
 export const SITES = [
@@ -107,17 +107,20 @@ async function improve(text, override) {
   let engine = override || settings.engine;
   if ((engine === 'nano' || engine === 'byok') && !pro) engine = 'local';
   const aboutMe = settings.aboutMeAuto && pro ? settings.aboutMe : '';
-  if (engine === 'inchat') return { ok: true, engine, mode: 'inchat', improved: buildMetaPrompt(rough) };
+  const activeProject = await getActiveProject();
+  const project = projectBrief(activeProject);
+  const usedProject = activeProject ? activeProject.name : '';
+  if (engine === 'inchat') return { ok: true, engine, mode: 'inchat', improved: buildMetaPrompt(rough, buildContext({ aboutMe, project })), usedProject };
   let improved, note = '';
   try {
-    if (engine === 'nano') improved = await improveWithNano(rough, aboutMe);
-    else if (engine === 'byok') improved = await improveWithByok(rough, aboutMe);
+    if (engine === 'nano') improved = await improveWithNano(rough, buildContext({ aboutMe, project }));
+    else if (engine === 'byok') improved = await improveWithByok(rough, buildContext({ aboutMe, project }));
   } catch (error) {
     note = friendlyEngineError(error);
     engine = 'local';
   }
-  if (!improved) improved = localImprove(rough, { aboutMe });
-  return { ok: true, engine, mode: 'replace', improved, diff: wordDiff(rough, improved), note };
+  if (!improved) improved = localImprove(rough, { aboutMe, project });
+  return { ok: true, engine, mode: 'replace', improved, diff: wordDiff(rough, improved), note, usedProject };
 }
 
 function friendlyEngineError(error) {
@@ -145,7 +148,7 @@ async function insertActive(message) {
   if (!tab) return { ok: false, error: 'not-ai-tab' };
   try {
     const result = await chrome.tabs.sendMessage(tab.id, { type: 'pd:insert', text: String(message.text || ''), send: Boolean(message.send), replace: message.replace !== false });
-    return { ok: Boolean(result?.ok), error: result?.error, site: siteFor(tab.url)?.name };
+    return { ok: Boolean(result?.ok), error: result?.error, guessed: Boolean(result?.guessed), site: siteFor(tab.url)?.name };
   } catch { return { ok: false, error: 'reload-tab', site: siteFor(tab.url)?.name }; }
 }
 

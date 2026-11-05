@@ -19,6 +19,12 @@ export const PRO_FEATURES = {
   markdownExport: 'Markdown export',
   aiEngines: 'Built-in AI and bring-your-own-key engines',
   aboutMeAuto: 'Auto-add your About me block',
+  projects: 'Unlimited projects',
+};
+
+// What the free tier gets before a Pro key is needed.
+export const FREE_LIMITS = {
+  projects: 2,
 };
 
 export const LIMITS = {
@@ -26,6 +32,9 @@ export const LIMITS = {
   promptTitle: 120,
   prompts: 5000,
   versionsPerPrompt: 20,
+  projects: 200,
+  projectName: 60,
+  projectText: 6000,
 };
 
 export const HOMEPAGE = 'https://promptdrawer.com';

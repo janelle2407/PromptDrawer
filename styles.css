@@ -80,3 +80,10 @@ kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px;
 .pill-demo{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:1px 8px 1px 3px;font-size:11px;background:var(--card)}
 .pill-demo .p{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-weight:800;font-size:10px}
 @media(prefers-color-scheme:light){:root:not([data-theme="dark"]) .diff ins{background:#dcfce7;color:#14532d}}
+
+/* Project bar (side panel) */
+.project-bar{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
+.project-bar label{margin:0;font-size:12px;color:var(--muted);white-space:nowrap}
+.project-bar select{flex:1;min-width:0;padding:5px 8px;min-height:30px;font-size:13px}
+.project-bar .small-btn{font-size:12px;padding:4px 10px;min-height:30px;white-space:nowrap}
+.project-bar[data-active="true"] select{border-color:var(--accent);background:var(--tint)}

@@ -18,15 +18,42 @@
   const visible = (el) => el && el.isConnected && el.getClientRects().length > 0;
   const editable = (el) => el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable);
 
+  // Sites such as claude.ai can show two chat boxes side by side (a project chat and a thread).
+  // Remember the one the person used last so inserts land there, not in the first one on the page.
+  let lastUsed = null;
+  document.addEventListener('focusin', event => {
+    const target = event.composedPath()[0];
+    if (editable(target) && !root.contains(target)) lastUsed = target;
+  }, true);
+
   function findComposer() {
+    let candidates = [];
     for (const selector of adapter.composer) {
-      const el = [...document.querySelectorAll(selector)].find(visible);
-      if (el) return el;
+      candidates = [...document.querySelectorAll(selector)].filter(visible);
+      if (candidates.length) break;
     }
+    if (!candidates.length) {
+      const active = document.activeElement;
+      if (editable(active) && !root.contains(active) && visible(active)) return active;
+      const all = [...document.querySelectorAll('textarea, [contenteditable="true"]')].filter(visible).filter(el => !root.contains(el));
+      candidates = all;
+    }
+    if (candidates.length <= 1) return candidates[0] || null;
+    // More than one chat box: the one the person is in, then the one used last,
+    // then the last on the page (threads and side panels come after the main chat).
     const active = document.activeElement;
-    if (editable(active) && !root.contains(active)) return active;
-    const all = [...document.querySelectorAll('textarea, [contenteditable="true"]')].filter(visible);
-    return all[all.length - 1] || null;
+    if (candidates.includes(active)) return active;
+    if (candidates.includes(lastUsed)) return lastUsed;
+    return candidates[candidates.length - 1];
+  }
+
+  // True when the page shows several chat boxes and none has been used yet, so the pick is a guess.
+  function composerGuessed() {
+    for (const selector of adapter.composer) {
+      const found = [...document.querySelectorAll(selector)].filter(visible);
+      if (found.length) return found.length > 1 && !found.includes(document.activeElement) && !found.includes(lastUsed);
+    }
+    return false;
   }
 
   function readComposer(el = findComposer()) {
@@ -46,6 +73,7 @@
   async function writeComposer(text, { replace = true } = {}) {
     const el = findComposer();
     if (!el) return { ok: false, error: 'no-composer' };
+    const guessed = composerGuessed();
     el.focus();
     if (el instanceof HTMLTextAreaElement) {
       const next = replace ? text : (el.value ? el.value + '\n' + text : text);
@@ -54,7 +82,7 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.selectionStart = el.selectionEnd = el.value.length;
-      return { ok: true };
+      return { ok: true, guessed };
     }
     const selection = window.getSelection();
     const selectAll = () => { const range = document.createRange(); range.selectNodeContents(el); selection.removeAllRanges(); selection.addRange(range); };
@@ -72,21 +100,21 @@
       data.setData('text/plain', replace ? text : '\n' + text);
       el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
       await sleep(60);
-      if (landed()) return { ok: true, method: 'paste' };
+      if (landed()) return { ok: true, method: 'paste', guessed };
     } catch { /* fall through */ }
     // 2. execCommand insertText (still works in Chrome for contenteditable).
     try {
       if (replace) document.execCommand('selectAll', false); else placeCaretAtEnd();
       document.execCommand('insertText', false, replace ? text : '\n' + text);
       await sleep(60);
-      if (landed()) return { ok: true, method: 'insertText' };
+      if (landed()) return { ok: true, method: 'insertText', guessed };
     } catch { /* fall through */ }
     // 3. Last resort: set the text and tell the framework something changed.
     el.innerText = want;
     el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: want }));
     await sleep(30);
     placeCaretAtEnd();
-    return { ok: landed(), method: 'innerText', error: landed() ? '' : 'insert-failed' };
+    return { ok: landed(), method: 'innerText', guessed, error: landed() ? '' : 'insert-failed' };
   }
 
   async function pressSend() {
@@ -267,7 +295,8 @@
         closeDialog();
         const result = await writeComposer(improved, { replace: true });
         if (!result.ok) { toast('Could not write into the chat box. Copy instead?', { action: 'Copy', onAction: () => navigator.clipboard?.writeText(improved) }); return; }
-        const message = current.mode === 'inchat' ? 'Now press Enter. The AI will reply with an improved prompt you can copy or save.' : 'Prompt improved. Press Enter to send it.';
+        let message = current.mode === 'inchat' ? 'Now press Enter. The AI will reply with an improved prompt you can copy or save.' : 'Prompt improved. Press Enter to send it.';
+        if (result.guessed) message += ' Wrong chat box? Undo, click in the one you want, then Use this again.';
         toast(message, { action: 'Undo', onAction: () => writeComposer(rough, { replace: true }), ms: 9000 });
       });
     });
@@ -315,7 +344,7 @@
         (async () => {
           const result = await writeComposer(String(message.text || ''), { replace: message.replace !== false });
           if (result.ok && message.send) await pressSend();
-          else if (result.ok) toast('Inserted from PromptDrawer.');
+          else if (result.ok) toast(result.guessed ? 'Inserted from PromptDrawer. Wrong chat box? Click in the one you want, then insert again.' : 'Inserted from PromptDrawer.');
           respond(result);
         })();
         return true;

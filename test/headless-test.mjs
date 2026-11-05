@@ -25,7 +25,8 @@ try {
   await panel.fill('#imp-in', 'write an email to my landlord about the broken heater');
   await panel.click('#imp-go');
   await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
-  log('drawer Improve produces a result', /Role:/.test(await panel.inputValue('#imp-out')));
+  const firstOut = await panel.inputValue('#imp-out');
+  log('drawer Improve produces a CIDI result', ['Context:', 'Instructions:', 'Details:', 'Input:'].every(l => firstOut.includes(l)) && firstOut.indexOf('Context:') < firstOut.indexOf('Instructions:') && firstOut.indexOf('Instructions:') < firstOut.indexOf('Details:') && firstOut.indexOf('Details:') < firstOut.indexOf('Input:'), JSON.stringify(firstOut.slice(0, 80)));
   await panel.click('#imp-save'); await panel.waitForTimeout(300);
   const savedFromImprove = await panel.evaluate(() => chrome.storage.local.get('prompts'));
   log('drawer Improve can save the result', (savedFromImprove.prompts || []).length === 1 && savedFromImprove.prompts[0].source === 'improve');
@@ -33,7 +34,28 @@ try {
   await panel.selectOption('#imp-engine', 'inchat'); await panel.waitForTimeout(400);
   log('drawer Improve switches engine on change', /prompt engineer/.test(await panel.inputValue('#imp-out')) && (await panel.textContent('#imp-insert')).includes('Enter'));
   await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(300);
-  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 4);
+  // --- projects ---
+  await panel.selectOption('#project-select', '__new');
+  await panel.waitForSelector('#project-editor:not([hidden])', { timeout: 3000 });
+  await panel.fill('#pj-name', 'Poppiwink'); await panel.fill('#pj-context', 'A kids picture-book brand about a curious puppy.'); await panel.fill('#pj-instructions', 'Australian spelling. Keep it warm and short.');
+  await panel.click('#pj-save'); await panel.waitForSelector('#project-editor', { state: 'hidden' }); await panel.waitForTimeout(300);
+  const pjSettings = await panel.evaluate(() => chrome.storage.local.get(['projects', 'settings']));
+  log('project editor saves and activates the project', (pjSettings.projects || []).length === 1 && pjSettings.settings.activeProject === pjSettings.projects[0].id && (await panel.locator('#project-select option').count()) === 3);
+  await panel.fill('#imp-in', 'write a caption for the new book'); await panel.click('#imp-go'); await panel.waitForSelector('#imp-result:not([hidden])');
+  const pjOut = await panel.inputValue('#imp-out');
+  log('drawer Improve folds the project in (local engine)', /Project: Poppiwink/.test(pjOut) && /Australian spelling/.test(pjOut) && /Used project/.test(await panel.textContent('#imp-note')));
+  const pjInchat = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'write a caption', engine: 'inchat' }));
+  log('in-chat meta-prompt carries the project', pjInchat?.ok && /curious puppy/.test(pjInchat.improved) && pjInchat.usedProject === 'Poppiwink');
+  const filled = await panel.evaluate(() => import(chrome.runtime.getURL('lib/storage.js')).then(m => m.fillVariables('Hi {{project}} and {{about_me}} and {{x|y}}', {}, 'ME', 'BRIEF')));
+  log('{{project}} variable fills', filled === 'Hi BRIEF and ME and y');
+  await panel.click('#project-edit'); await panel.waitForSelector('#project-editor:not([hidden])');
+  log('edit button opens the active project', (await panel.inputValue('#pj-name')) === 'Poppiwink' && !(await panel.isHidden('#pj-delete')));
+  await panel.click('#pj-cancel');
+  await panel.selectOption('#project-select', ''); await panel.waitForTimeout(300);
+  await panel.click('#imp-go'); await panel.waitForTimeout(300);
+  log('"No project" switches it off again', !/Project: Poppiwink/.test(await panel.inputValue('#imp-out')) && (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.activeProject === '');
+  await panel.selectOption('#project-select', pjSettings.projects[0].id); await panel.waitForTimeout(200);
+  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 5);
   await panel.click('#tab-library');
   await panel.waitForSelector('#empty:not([hidden])', { timeout: 5000 });
   log('panel shows empty state with packs', (await panel.locator('#packs button').count()) === 3);
@@ -63,7 +85,7 @@ try {
   await panel.keyboard.press('Escape');
   // improve via SW message (local engine)
   const improved = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'write an email to my landlord about the broken heater, friendly' }));
-  log('improve local engine', improved?.ok && improved.mode === 'replace' && /Role:/.test(improved.improved) && improved.diff.length > 1, (improved?.improved || '').split('\n')[0]);
+  log('improve local engine', improved?.ok && improved.mode === 'replace' && /Context:/.test(improved.improved) && improved.diff.length > 1, (improved?.improved || '').split('\n')[0]);
   const inchat = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'plan a trip', engine: 'inchat' }));
   log('improve in-chat engine', inchat?.ok && inchat.mode === 'inchat' && /prompt engineer/.test(inchat.improved));
   const nano = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', text: 'plan a trip', engine: 'nano' }));
@@ -79,12 +101,12 @@ try {
   // export json
   const [download] = await Promise.all([panel.waitForEvent('download'), panel.click('#export-json')]);
   const path = await download.path(); const json = JSON.parse(fs.readFileSync(path, 'utf8'));
-  log('export json', json.prompts.length === 7 && !JSON.stringify(json).includes('byokKeys'));
+  log('export json includes projects, never keys', json.prompts.length === 7 && json.projects?.length === 1 && !JSON.stringify(json).includes('byokKeys'));
   // --- welcome page ---
   const welcome = await ctx.newPage(); welcome.on('pageerror', e => errors.push('welcome: ' + e.message));
   await welcome.goto(`chrome-extension://${id}/welcome.html`); await welcome.waitForSelector('#try-go');
   await welcome.click('#try-go'); await welcome.waitForSelector('#try-result:not([hidden])', { timeout: 5000 });
-  log('welcome page try-it box improves', /Role:/.test(await welcome.inputValue('#try-out')));
+  log('welcome page try-it box improves', /Context:/.test(await welcome.inputValue('#try-out')));
   await welcome.close();
   // --- options ---
   const opts = await ctx.newPage();
@@ -138,6 +160,25 @@ try {
   const all = await panel.evaluate(() => chrome.storage.local.get('prompts'));
   const fromPage = (all.prompts || []).find(p => p.body.includes('Appended line'));
   log('Alt+S save from page lands in storage with source', Boolean(fromPage) && fromPage.source === 'ChatGPT', JSON.stringify(fromPage && { title: fromPage.title, source: fromPage.source }));
+  // --- two chat boxes side by side (claude.ai project chat + thread) ---
+  const claudeHtml = `<!doctype html><html><body><div id="left" class="ProseMirror" contenteditable="true"><p><br></p></div><div id="right" class="ProseMirror" contenteditable="true"><p><br></p></div><script>
+    for (const ed of document.querySelectorAll('.ProseMirror')) ed.addEventListener('paste',e=>{e.preventDefault();const t=e.clipboardData.getData('text/plain');const html=t.replace(/^\\n/,'').split('\\n').map(l=>'<p>'+(l||'<br>')+'</p>').join('');ed.innerHTML=html;});</script></body></html>`;
+  await ctx.route('https://claude.ai/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: claudeHtml }));
+  const claude = await ctx.newPage(); claude.on('pageerror', e => errors.push('claude: ' + e.message));
+  await claude.goto('https://claude.ai/'); await claude.waitForSelector('#promptdrawer-root', { state: 'attached', timeout: 8000 });
+  await claude.bringToFront();
+  const g1 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Hello thread', replace: true }));
+  const boxes1 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes, none used yet: insert goes to the last one and is flagged as a guess', g1?.ok && g1.guessed === true && boxes1[1].includes('Hello thread') && !boxes1[0].includes('Hello thread'), JSON.stringify([g1, boxes1]));
+  await claude.focus('#left'); await claude.waitForTimeout(100);
+  const g2 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Hello project', replace: true }));
+  const boxes2 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes: insert goes to the one you clicked in', g2?.ok && g2.guessed === false && boxes2[0].includes('Hello project') && !boxes2[1].includes('Hello project'), JSON.stringify([g2, boxes2]));
+  await claude.evaluate(() => document.getElementById('left').blur());
+  const g3 = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Still project', replace: true }));
+  const boxes3 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
+  log('two chat boxes: after clicking away, insert still goes to the one used last', g3?.ok && boxes3[0].includes('Still project') && !boxes3[1].includes('Still project'), JSON.stringify([g3, boxes3]));
+  await claude.close();
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
   await ctx.unroute('https://chatgpt.com/**');

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.2 (2026-11-02)
+
+- Improve now writes every prompt in the **CIDI** shape: Context, Instructions, Details, Input. Same four labels on all four engines (tidy-up, ask-the-AI, Chrome built-in AI, own key), so the structure is easy to learn and the AI gets a clear Input slot for the text or data to work from.
+
+## 0.2.1 (2026-11-02)
+
+- Two chat boxes on one page (Claude's project chat beside a thread): inserts now go to the box you are in or used last, not the first one on the page. If neither has been used yet, PromptDrawer picks the last one and says so in the toast.
+
+## 0.2.0 (2026-11-02)
+
+Projects: context and instructions that travel with you.
+- **Projects** at the top of the drawer: a name, "Context: what the AI should know" and "Instructions: how the AI should work". Pick one and Improve (in the drawer and with Alt+I on chat sites) folds it into every rewrite, on every engine.
+- **Brief the AI** button: puts the whole project into the chat box as the first message of a new chat (or copies it if no AI tab is open).
+- `{{project}}` works inside any saved prompt, next to `{{about_me}}`.
+- Optional setting to prepend the project brief to every inserted prompt (off by default).
+- Projects ride along in JSON export/import. Free: 2 projects; Pro: unlimited.
+
 ## 0.1.1 (2026-11-01)
 
 Easier first use, after real-person testing.
