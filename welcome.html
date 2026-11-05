@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Welcome to PromptDrawer</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body[data-surface="welcome"]{max-width:820px;margin:0 auto;padding:32px 20px 80px;min-height:auto}
+  .hero{display:flex;align-items:center;gap:14px;margin-bottom:6px}.hero .logo{width:44px;height:44px;font-size:20px;border-radius:12px}
+  .hero h1{font-size:26px}.sub{color:var(--muted);margin:0 0 22px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .step{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:16px}
+  .step .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-weight:800;margin-bottom:8px}
+  .step h2{font-size:15px;margin:0 0 6px}.step p{margin:0;font-size:13px;color:var(--muted)}
+  .demo{margin:12px 0 0;border:1px dashed var(--line);border-radius:10px;padding:10px;font-size:12px;color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 4px;background:var(--card);box-shadow:0 4px 14px rgba(16,24,40,.12);font-size:12px;font-weight:600}
+  .pill .p{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-weight:800;font-size:12px}
+  .try{margin-top:22px}.try textarea{min-height:90px}#try-out{min-height:220px}
+  .try .row-btns{margin-top:8px}
+  .fine{font-size:12px;color:var(--muted);margin-top:28px}
+</style>
+</head>
+<body data-surface="welcome">
+<div class="hero"><span class="logo" aria-hidden="true">P</span><div><h1>PromptDrawer is installed</h1></div></div>
+<p class="sub">Your prompts, in every AI. Three things to know, then try it right here.</p>
+
+<div class="grid">
+  <section class="step">
+    <span class="n">1</span>
+    <h2>Look for the pill</h2>
+    <p>Open ChatGPT, Claude, Gemini, Perplexity or Copilot. <strong>Reload</strong> any tab that was already open. This appears bottom-right:</p>
+    <div class="demo"><span class="pill"><span class="p">P</span> Save &nbsp; Improve</span></div>
+  </section>
+  <section class="step">
+    <span class="n">2</span>
+    <h2>Type, then press Improve</h2>
+    <p>Type something rough in the chat box, e.g. <em>write an email to my landlord about the broken heater</em>. Click <strong>Improve</strong> on the pill (or press <kbd>Alt</kbd>+<kbd>I</kbd>). Check the result, press <strong>Use this</strong>, then Enter.</p>
+  </section>
+  <section class="step">
+    <span class="n">3</span>
+    <h2>Keep the good ones</h2>
+    <p>Press <kbd>Alt</kbd>+<kbd>S</kbd> (or <strong>Save</strong> on the pill) to keep what you typed. Click the PromptDrawer icon in your toolbar to open the drawer and <strong>Insert</strong> any saved prompt into any chat.</p>
+  </section>
+</div>
+
+<section class="section try" aria-labelledby="h-try">
+  <h2 id="h-try">Try it now, right here</h2>
+  <p>No AI tab needed. Type a rough request and press Improve.</p>
+  <label for="try-in">Your rough request</label>
+  <textarea id="try-in">write an email to my landlord about the broken heater, friendly but firm</textarea>
+  <label for="try-engine">How to improve it</label>
+  <select id="try-engine">
+    <option value="local">Quick tidy-up (no AI, instant)</option>
+    <option value="nano">Chrome's built-in AI (on your device)</option>
+    <option value="byok">My own API key (best quality, add it in Settings)</option>
+  </select>
+  <p id="try-help" class="hint"></p>
+  <div class="row-btns"><button id="try-go" class="primary" type="button">Improve</button></div>
+  <div id="try-result" hidden>
+    <label for="try-out">Improved prompt (you can edit it)</label>
+    <textarea id="try-out"></textarea>
+    <p id="try-note" class="pro-note" hidden></p>
+    <div class="row-btns"><button id="try-copy" type="button">Copy</button><button id="try-save" type="button">Save to my prompts</button><button id="try-chatgpt" type="button">Open ChatGPT</button></div>
+    <p id="try-status" class="result"></p>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="h-engines">
+  <h2 id="h-engines">Honest note about the engines</h2>
+  <p><strong>Quick tidy-up</strong> is not AI. It wraps your words in a structure (role, task, requirements, format) that AI assistants respond well to. It will never rewrite your request.</p>
+  <p><strong>Ask the AI in this chat</strong> (free) hands the rewriting to ChatGPT, Claude or whichever AI you are talking to: press Use this, then Enter, and copy the prompt it writes back.</p>
+  <p><strong>Chrome's built-in AI</strong> and <strong>your own API key</strong> do real AI rewriting without leaving the dialog. Set them up under Settings.</p>
+  <div class="row-btns"><button id="open-settings" type="button">Open Settings</button><button id="open-drawer" type="button">Open the drawer</button></div>
+</section>
+
+<p class="fine">Everything is stored on this device. No account, no server, no analytics. Shortcuts can be changed at chrome://extensions/shortcuts.</p>
+<script type="module" src="welcome.js"></script>
+</body>
+</html>

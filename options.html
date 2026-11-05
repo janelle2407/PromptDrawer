@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PromptDrawer settings</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-surface="options">
+<header class="top" style="padding:0 0 8px">
+  <div class="brand"><span class="logo" aria-hidden="true">P</span><div><h1>PromptDrawer settings</h1><p class="eyebrow" id="pro-badge">Free</p></div></div>
+</header>
+<p class="meta">Everything here is stored in this browser profile. PromptDrawer has no server and no analytics.</p>
+
+<section class="section" aria-labelledby="h-shortcuts">
+  <h2 id="h-shortcuts">Shortcuts</h2>
+  <p>Inside ChatGPT, Claude, Gemini, Perplexity or Copilot: <kbd>Alt</kbd>+<kbd>S</kbd> saves what you are typing, <kbd>Alt</kbd>+<kbd>I</kbd> improves it, <kbd>Alt</kbd>+<kbd>D</kbd> opens the drawer. Change them at <code>chrome://extensions/shortcuts</code>.</p>
+  <label class="check"><input type="checkbox" id="showToolbar"> Show the small Save / Improve toolbar on chat pages</label>
+  <label for="theme">Appearance</label>
+  <select id="theme"><option value="system">Use device setting</option><option value="light">Light</option><option value="dark">Dark</option></select>
+</section>
+
+<section class="section" aria-labelledby="h-about">
+  <h2 id="h-about">About me</h2>
+  <p>A few lines the AI should know about you (who you are, how you like answers). Use <code>{{about_me}}</code> in any prompt to drop it in.</p>
+  <textarea id="aboutMe" placeholder="I run a small business. I live with chronic pain, so keep answers short and step by step…"></textarea>
+  <label class="check"><input type="checkbox" id="aboutMeAuto"> Add it automatically when Improve rewrites a prompt <span class="pro-tag">(Pro)</span></label>
+</section>
+
+<section class="section" aria-labelledby="h-engine">
+  <h2 id="h-engine">Improve engine</h2>
+  <p>How <strong>Improve</strong> rewrites a rough request. You can switch engines in the Improve dialog too.</p>
+  <label for="engine">Default engine</label>
+  <select id="engine">
+    <option value="local">Quick tidy-up (no AI, instant, free)</option>
+    <option value="inchat">Ask the AI in this chat (free)</option>
+    <option value="nano">Chrome's built-in AI, on your device (Pro)</option>
+    <option value="byok">My own API key (Pro)</option>
+  </select>
+  <p id="nano-status" class="result"></p>
+  <div id="byok" hidden>
+    <label for="byokProvider">Provider</label>
+    <select id="byokProvider"><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option></select>
+    <label for="byokModel">Model (leave blank for the default)</label>
+    <input id="byokModel" placeholder="">
+    <label for="byokKey">API key</label>
+    <input id="byokKey" type="password" autocomplete="off" placeholder="Paste a key from your provider">
+    <p>Your key stays on this device and is only ever sent to the provider you choose. Saving asks Chrome for permission to contact that provider.</p>
+    <div class="actions"><button id="byokSave" class="primary" type="button">Save key</button><button id="byokRemove" type="button">Remove key</button></div>
+    <p id="byok-result" class="result"></p>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="h-pro">
+  <h2 id="h-pro">PromptDrawer Pro</h2>
+  <p>One-time purchase, no subscription. Unlocks <span id="pro-list"></span>. 7-day refund, no questions.</p>
+  <p id="test-mode" class="pro-note" hidden>Test build: every Pro feature is unlocked for you.</p>
+  <label for="licenseKey">Licence key</label>
+  <input id="licenseKey" autocomplete="off" placeholder="Paste the key from your receipt">
+  <div class="actions"><button id="licenseActivate" class="primary" type="button">Activate</button><button id="licenseRemove" type="button">Remove</button><button id="buy" type="button">Get Pro</button></div>
+  <p id="license-result" class="result"></p>
+</section>
+
+<section class="section" aria-labelledby="h-data">
+  <h2 id="h-data">Your data</h2>
+  <p>Prompts live in <code>chrome.storage.local</code>. Export them from the drawer any time. Removing the extension deletes everything it stored.</p>
+  <div class="actions"><button id="wipe" class="danger" type="button">Delete all prompts and settings</button></div>
+  <p id="wipe-result" class="result"></p>
+</section>
+
+<p class="meta" style="margin-top:20px">Open source (MIT). <a id="homepage" href="#" target="_blank" rel="noopener">promptdrawer.com</a></p>
+<script type="module" src="options.js"></script>
+</body>
+</html>
