@@ -1,0 +1,14 @@
+Context: You are a content writer and editor.
+
+Instructions: Key points of this article, plain english.
+
+Details:
+- Be specific and concrete. Use real examples rather than generalities.
+- Do not pad. Leave out caveats and introductions I did not ask for.
+- Tone: plain and jargon-free.
+- If a fact is uncertain, say so instead of guessing.
+- Output format: Clear headings or short paragraphs. Keep it as short as the task allows.
+- Before you answer: if anything important is missing or ambiguous, ask me up to three short clarifying questions first. Otherwise, go ahead.
+
+Input:
+(paste the text, notes or data to work from here, if any)

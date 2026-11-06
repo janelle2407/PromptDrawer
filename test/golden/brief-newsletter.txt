@@ -1,0 +1,17 @@
+Context: You are a content writer and editor. Why this matters: Subscribers have gone quiet since the move to Kit.
+
+Instructions: Write our November newsletter.
+
+Details:
+- Under 300 words.
+- No discount codes.
+- Warm, not salesy.
+- Be specific and concrete. Use real examples and sources rather than generalities.
+- Do not pad. Leave out caveats and introductions I did not ask for.
+- Tone: friendly and warm.
+- If a fact is uncertain, say so instead of guessing.
+- Done looks like: Subject line, 3 short sections, one link. Check your answer against this before you reply.
+- Before you start: if anything important is missing or ambiguous, ask me up to three short clarifying questions first. Otherwise, go ahead.
+
+Input:
+(paste the text, notes or data to work from here, if any)
