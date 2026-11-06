@@ -179,6 +179,67 @@ try {
   const boxes3 = await claude.evaluate(() => [document.getElementById('left').innerText, document.getElementById('right').innerText]);
   log('two chat boxes: after clicking away, insert still goes to the one used last', g3?.ok && boxes3[0].includes('Still project') && !boxes3[1].includes('Still project'), JSON.stringify([g3, boxes3]));
   await claude.close();
+  // --- 0.2.3: copilot.com (new hostname) gets the Copilot adapter, not the generic fallback ---
+  // A decoy textarea after the real one: the generic fallback would pick the last box; the adapter picks #userInput and finds the send button.
+  const copilotComHtml = copilotHtml.replace('<button', '<textarea id="decoy"></textarea><button');
+  await ctx.route('https://copilot.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: copilotComHtml }));
+  const cc = await ctx.newPage(); cc.on('pageerror', e => errors.push('copilot.com: ' + e.message));
+  await cc.goto('https://copilot.com/'); await cc.waitForSelector('#promptdrawer-root', { state: 'attached', timeout: 8000 });
+  await cc.bringToFront();
+  const ccIns = await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:insert-active', text: 'Hello new Copilot', send: true }));
+  await cc.waitForTimeout(300);
+  const ccState = await cc.evaluate(() => ({ main: document.getElementById('userInput').value, decoy: document.getElementById('decoy').value, sent: window.sent }));
+  log('copilot.com uses the Copilot adapter (right box, send button found)', ccIns?.ok && ccIns.guessed === false && ccState.main === 'Hello new Copilot' && ccState.decoy === '' && ccState.sent === 1, JSON.stringify([ccIns, ccState]));
+  await cc.close();
+  // --- 0.2.3: closed-shadow-root probe via CDP (the toolbar lives in a closed shadow root) ---
+  async function inShadow(page, selector, expr) {
+    const cdp = await ctx.newCDPSession(page);
+    try {
+      const { root: doc } = await cdp.send('DOM.getDocument', { depth: 0 });
+      const { nodeId: hostId } = await cdp.send('DOM.querySelector', { nodeId: doc.nodeId, selector: '#promptdrawer-root' });
+      const { node } = await cdp.send('DOM.describeNode', { nodeId: hostId, depth: 0, pierce: true });
+      const { nodeIds } = await cdp.send('DOM.pushNodesByBackendIdsToFrontend', { backendNodeIds: [node.shadowRoots[0].backendNodeId] });
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: nodeIds[0], selector });
+      if (!nodeId) return null;
+      const { object } = await cdp.send('DOM.resolveNode', { nodeId });
+      const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: `function(){ return ${expr}; }`, returnByValue: true });
+      return result.value;
+    } finally { await cdp.detach(); }
+  }
+  // --- 0.2.3: macOS Option+I sends key "ˆ" with code "KeyI"; the fallback shortcut must still open Improve ---
+  await gpt.bringToFront(); await gpt.focus('#prompt-textarea');
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
+  log('no Improve dialog before the Option-key test', (await inShadow(gpt, '#pd-out', 'true')) === null);
+  const kb = await ctx.newCDPSession(gpt);
+  await kb.send('Input.dispatchKeyEvent', { type: 'keyDown', modifiers: 1, key: 'ˆ', code: 'KeyI', windowsVirtualKeyCode: 73, nativeVirtualKeyCode: 73 });
+  await kb.send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers: 1, key: 'ˆ', code: 'KeyI', windowsVirtualKeyCode: 73, nativeVirtualKeyCode: 73 });
+  await kb.detach(); await gpt.waitForTimeout(700);
+  log('Option+I on a Mac keyboard (key "ˆ", code KeyI) opens Improve', (await inShadow(gpt, '#pd-out', 'true')) === true);
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
+  // --- 0.2.3: turning the toolbar off in Settings also hides the first-run tip; tipSeen is applied live ---
+  const before = (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings || {};
+  await panel.evaluate(s => chrome.storage.local.set({ settings: { ...s, showToolbar: true, tipSeen: false } }), before);
+  await gpt.waitForTimeout(200);
+  log('tip shows again when tipSeen is cleared', (await inShadow(gpt, '#tip', 'this.hidden')) === false && (await inShadow(gpt, '#bar', 'this.hidden')) === false);
+  await panel.evaluate(s => chrome.storage.local.set({ settings: { ...s, showToolbar: false, tipSeen: false } }), before);
+  await gpt.waitForTimeout(200);
+  log('toolbar off hides the tip too', (await inShadow(gpt, '#tip', 'this.hidden')) === true && (await inShadow(gpt, '#bar', 'this.hidden')) === true);
+  await panel.evaluate(s => chrome.storage.local.set({ settings: { ...s, showToolbar: true, tipSeen: true } }), before);
+  await gpt.waitForTimeout(200);
+  log('toolbar back on with tipSeen keeps the tip hidden', (await inShadow(gpt, '#tip', 'this.hidden')) === true && (await inShadow(gpt, '#bar', 'this.hidden')) === false);
+  // --- 0.2.3: a slow earlier engine reply must not overwrite a newer one (panel Improve) ---
+  await panel.bringToFront(); await panel.click('#tab-improve'); await panel.waitForSelector('#imp-in', { state: 'visible' });
+  await panel.evaluate(() => {
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...rest) => { const p = orig(m, ...rest); return (m?.type === 'pd:improve' && m.engine === 'inchat') ? p.then(v => new Promise(res => setTimeout(() => res(v), 900))) : p; };
+  });
+  await panel.fill('#imp-in', 'write a product description for a mug');
+  await panel.selectOption('#imp-engine', 'local'); await panel.click('#imp-go'); await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
+  await panel.selectOption('#imp-engine', 'inchat'); // slow reply (900 ms)
+  await panel.selectOption('#imp-engine', 'local');  // fast reply
+  await panel.waitForTimeout(1500);
+  const raceOut = await panel.inputValue('#imp-out'); const raceEngine = await panel.inputValue('#imp-engine'); const raceBtn = await panel.textContent('#imp-go');
+  log('late reply from an older engine is ignored (panel)', raceEngine === 'local' && /Context:/.test(raceOut) && !/better prompt|improve/i.test(raceOut.split('\n')[0]) && raceBtn.trim() === 'Improve', JSON.stringify({ raceEngine, first: raceOut.split('\n')[0], raceBtn }));
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
   await ctx.unroute('https://chatgpt.com/**');
