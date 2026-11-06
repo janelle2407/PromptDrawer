@@ -324,7 +324,7 @@ function setImproveMode(mode, { remember = true } = {}) {
   state.improveMode = mode; state.improved = null; improveGen++;
   $('#imp-mode-prompt').setAttribute('aria-pressed', String(mode === 'prompt')); $('#imp-mode-brief').setAttribute('aria-pressed', String(mode === 'brief'));
   $('#imp-prompt-fields').hidden = mode === 'brief'; $('#imp-brief-fields').hidden = mode !== 'brief';
-  $('#imp-go').textContent = mode === 'brief' ? 'Write the prompt' : 'Improve';
+  $('#imp-go').textContent = mode === 'brief' ? 'Write the prompt' : 'Improve'; $('#imp-go').disabled = false; // a run in flight is dropped by the improveGen bump above, so hand the button back here
   $('#imp-lead').textContent = mode === 'brief'
     ? 'Bigger job? Answer four quick questions and PromptDrawer writes the long, detailed CIDI prompt for you. Only the job is required.'
     : 'Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.';
