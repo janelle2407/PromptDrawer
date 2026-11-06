@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "PromptDrawer",
-  "version": "0.2.3",
-  "description": "Your prompts, in every AI. Save, reuse and improve prompts inside ChatGPT, Claude, Gemini, Perplexity and Copilot. Stored on your device.",
+  "version": "0.3.0",
+  "description": "Your prompts, in every AI. Save and reuse prompts, tidy a quick prompt, or brief the AI on a bigger job. Stored on your device.",
   "minimum_chrome_version": "116",
   "permissions": [
     "storage",

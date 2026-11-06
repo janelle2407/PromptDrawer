@@ -3,7 +3,7 @@
 import { PRO_FEATURES } from './config.js';
 import { wordDiff } from './lib/diff.js';
 import { improveWithByok, improveWithNano, nanoAvailability } from './lib/engines.js';
-import { buildContext, buildMetaPrompt, localImprove } from './lib/improver.js';
+import { buildBriefMetaPrompt, buildContext, buildMetaPrompt, briefToText, localBrief, localImprove, normaliseBrief } from './lib/improver.js';
 import { isPro } from './lib/license.js';
 import { bumpUse, getActiveProject, getSettings, projectBrief, savePrompt, titleFrom } from './lib/storage.js';
 import { LIMITS } from './config.js';
@@ -81,7 +81,7 @@ async function handle(message, sender) {
       });
       return { ok: true, prompt };
     }
-    case 'pd:improve': return improve(message.text, message.engine);
+    case 'pd:improve': return improve(message.text, message.engine, message.brief);
     case 'pd:open-panel': return { ok: await openPanel(sender.tab) };
     case 'pd:sites': return { ok: true, sites: SITES.map(({ id, name, home }) => ({ id, name, home })), open: await openSites() };
     case 'pd:insert-active': return insertActive(message);
@@ -99,8 +99,11 @@ async function handle(message, sender) {
   }
 }
 
-async function improve(text, override) {
-  const rough = typeof text === 'string' ? text.trim().slice(0, LIMITS.promptBody) : '';
+async function improve(text, override, briefInput) {
+  // Brief mode: four short answers (job, why, rules, done) instead of one rough line.
+  const brief = briefInput && typeof briefInput === 'object' ? normaliseBrief(briefInput) : null;
+  if (brief && !brief.job) return { ok: false, error: 'empty' };
+  const rough = brief ? briefToText(brief) : typeof text === 'string' ? text.trim().slice(0, LIMITS.promptBody) : '';
   if (!rough) return { ok: false, error: 'empty' };
   const settings = await getSettings();
   const pro = await isPro();
@@ -110,7 +113,7 @@ async function improve(text, override) {
   const activeProject = await getActiveProject();
   const project = projectBrief(activeProject);
   const usedProject = activeProject ? activeProject.name : '';
-  if (engine === 'inchat') return { ok: true, engine, mode: 'inchat', improved: buildMetaPrompt(rough, buildContext({ aboutMe, project })), usedProject };
+  if (engine === 'inchat') return { ok: true, engine, mode: 'inchat', improved: brief ? buildBriefMetaPrompt(brief, buildContext({ aboutMe, project })) : buildMetaPrompt(rough, buildContext({ aboutMe, project })), usedProject, brief: Boolean(brief) };
   let improved, note = '';
   try {
     if (engine === 'nano') improved = await improveWithNano(rough, buildContext({ aboutMe, project }));
@@ -119,8 +122,8 @@ async function improve(text, override) {
     note = friendlyEngineError(error);
     engine = 'local';
   }
-  if (!improved) improved = localImprove(rough, { aboutMe, project });
-  return { ok: true, engine, mode: 'replace', improved, diff: wordDiff(rough, improved), note, usedProject };
+  if (!improved) improved = brief ? localBrief(brief, { aboutMe, project }) : localImprove(rough, { aboutMe, project });
+  return { ok: true, engine, mode: 'replace', improved, diff: wordDiff(rough, improved), note, usedProject, brief: Boolean(brief) };
 }
 
 function friendlyEngineError(error) {

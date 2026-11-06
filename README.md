@@ -5,10 +5,16 @@
 - **Save** what you are typing with `Alt+S` (or the small toolbar, or the right-click menu).
 - **Insert** any saved prompt into the chat you have open. `{{blanks}}` get filled in as you go.
 - **Improve** a rough line with `Alt+I` into a CIDI prompt (Context, Instructions, Details, Input): see a before/after diff, press *Use this*, and *Undo* if you change your mind. Works offline (instant structure), or asks the AI you are already talking to (free), or uses Chrome's on-device model or your own API key (Pro).
+- **Brief mode** for bigger jobs: flip Improve to *Brief*, answer four short boxes (the job, why, rules, done looks like) and get a long, detailed CIDI prompt. No questions, only the job is required.
 - **Projects**: a reusable brief (context + instructions) that Improve folds into every rewrite, in every AI. One click to brief a new chat; `{{project}}` inside any saved prompt. Two free, unlimited with Pro.
 - **Ask all three**: send one prompt to every open AI tab and compare the answers (Pro).
 - **Folders, tags, favourites, search, version history, JSON/Markdown export**, three starter packs.
 - **No account, no server, no analytics.** Open source core (MIT). Pro is a one-time key.
+
+## Prompt or brief?
+
+- **Prompt** is for a small job, or one you have already started: you type one rough line and PromptDrawer tidies it into a clear CIDI prompt.
+- **Brief** is for a bigger job. Flip the switch at the top of Improve and fill in four short boxes: *the job* (e.g. research competitor pricing), *why* (we are setting the price we compete with), *rules* (last 6 months only), *done looks like* (one page, 8 competitors). PromptDrawer writes the long, detailed prompt for you. No questions, only the job is required.
 
 ## Try it (unpacked)
 

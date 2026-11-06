@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 (2026-11-06)
+
+- **Brief mode** for bigger jobs (Janelle's idea). A Prompt / Brief toggle at the top of Improve (on chat sites and in the drawer). Brief shows four short boxes: **The job**, **Why**, **Rules**, **Done looks like**. The job is pre-filled with whatever you had typed. Press *Write the prompt* and you get the long CIDI version: Why becomes the Context, the job the Instructions, each rule its own Details line, plus a "Done looks like" line the AI must check its answer against. Works on all four engines; no questions asked, only the job is required.
+- Pressing Improve with an empty chat box now opens the Brief side instead of a "type something first" message.
+- PromptDrawer remembers which side (Prompt or Brief) you used last.
+- The extension description, welcome page and How-to tab now explain the difference: Prompt for a small job or one already started, Brief for a bigger job.
+
 ## 0.2.3 (2026-11-05)
 
 Four fixes from the code review of the first test build.

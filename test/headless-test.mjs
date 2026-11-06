@@ -55,7 +55,7 @@ try {
   await panel.click('#imp-go'); await panel.waitForTimeout(300);
   log('"No project" switches it off again', !/Project: Poppiwink/.test(await panel.inputValue('#imp-out')) && (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.activeProject === '');
   await panel.selectOption('#project-select', pjSettings.projects[0].id); await panel.waitForTimeout(200);
-  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 5);
+  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 6);
   await panel.click('#tab-library');
   await panel.waitForSelector('#empty:not([hidden])', { timeout: 5000 });
   log('panel shows empty state with packs', (await panel.locator('#packs button').count()) === 3);
@@ -240,6 +240,40 @@ try {
   await panel.waitForTimeout(1500);
   const raceOut = await panel.inputValue('#imp-out'); const raceEngine = await panel.inputValue('#imp-engine'); const raceBtn = await panel.textContent('#imp-go');
   log('late reply from an older engine is ignored (panel)', raceEngine === 'local' && /Context:/.test(raceOut) && !/better prompt|improve/i.test(raceOut.split('\n')[0]) && raceBtn.trim() === 'Improve', JSON.stringify({ raceEngine, first: raceOut.split('\n')[0], raceBtn }));
+  // --- 0.3.0: Brief mode in the drawer (four boxes -> long CIDI prompt) ---
+  await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', brief: { job: '   ' }, engine: 'local' })).then(r => log('brief without a job is refused', r?.ok === false && r.error === 'empty', JSON.stringify(r)));
+  await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(200);
+  await panel.click('#imp-mode-brief'); await panel.waitForTimeout(200);
+  log('Brief toggle shows the four boxes and renames the button', (await panel.isHidden('#imp-in')) && !(await panel.isHidden('#imp-job')) && (await panel.textContent('#imp-go')).trim() === 'Write the prompt' && (await panel.inputValue('#imp-job')) === 'write a product description for a mug');
+  await panel.fill('#imp-job', 'research competitor pricing'); await panel.fill('#imp-why', 'we are setting the price we compete with'); await panel.fill('#imp-rules', 'last 6 months only; Australian market'); await panel.fill('#imp-done', 'one page, 8 competitors, a table');
+  await panel.click('#imp-go'); await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
+  const briefOut = await panel.inputValue('#imp-out');
+  log('drawer Brief writes a CIDI prompt from the four boxes', /^Context: .*Why this matters: We are setting the price we compete with\./m.test(briefOut) && /^Instructions: Research competitor pricing\./m.test(briefOut) && /^- Last 6 months only\.$/m.test(briefOut) && /^- Australian market\.$/m.test(briefOut) && /- Done looks like: One page, 8 competitors, a table\./.test(briefOut) && /^Input:/m.test(briefOut) && (await panel.isDisabled('#imp-diff-toggle')), JSON.stringify(briefOut.slice(0, 120)));
+  await panel.selectOption('#imp-engine', 'inchat'); await panel.waitForTimeout(1500); // sendMessage is still patched to delay inchat by 900 ms
+  const briefInchat = await panel.inputValue('#imp-out');
+  log('drawer Brief on "Ask this AI" carries all four parts', /prompt engineer/.test(briefInchat) && /Job: research competitor pricing/.test(briefInchat) && /Why: we are setting/.test(briefInchat) && /Rules: last 6 months/.test(briefInchat) && /Done looks like: one page/.test(briefInchat));
+  await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(300);
+  log('Brief choice is remembered', (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.improveMode === 'brief');
+  await panel.click('#imp-mode-prompt'); await panel.waitForTimeout(200);
+  log('back to Prompt hides the boxes and the old result', !(await panel.isHidden('#imp-in')) && (await panel.isHidden('#imp-job')) && (await panel.isHidden('#imp-result')) && (await panel.textContent('#imp-go')).trim() === 'Improve' && (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.improveMode === 'prompt');
+  // --- 0.3.0: Brief mode in the Improve dialog on a chat site ---
+  await panel.evaluate(() => chrome.storage.local.get('settings').then(({ settings }) => chrome.storage.local.set({ settings: { ...settings, engine: 'local' } }))); // the options test left it on inchat
+  await gpt.bringToFront(); await gpt.waitForTimeout(200);
+  await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p>research competitor pricing</p>'; ed.focus(); });
+  await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(500);
+  log('dialog opens on the Prompt side when something is typed', (await inShadow(gpt, '#pd-modes button[data-mode="prompt"]', 'this.getAttribute("aria-pressed")')) === 'true' && (await inShadow(gpt, '#pd-brief', 'this.hidden')) === true && /^Context:/.test(await inShadow(gpt, '#pd-out', 'this.value')));
+  await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(200);
+  log('Brief side pre-fills the job with what was typed', (await inShadow(gpt, '#pd-brief', 'this.hidden')) === false && (await inShadow(gpt, '#pd-job', 'this.value')) === 'research competitor pricing' && (await inShadow(gpt, '#pd-use', 'this.disabled')) === true && (await inShadow(gpt, '#pd-toggle-wrap', 'this.hidden')) === true);
+  await inShadow(gpt, '#pd-why', 'this.value = "price we are competing with", true'); await inShadow(gpt, '#pd-rules', 'this.value = "show last 6 months only", true'); await inShadow(gpt, '#pd-done', 'this.value = "one page, 8 competitors", true');
+  await inShadow(gpt, '#pd-brief-go', 'this.click(), true'); await gpt.waitForTimeout(600);
+  const dlgOut = await inShadow(gpt, '#pd-out', 'this.value');
+  log('dialog Brief writes the long prompt and enables Use this', /Why this matters: Price we are competing with\./.test(dlgOut) && /^- Show last 6 months only\.$/m.test(dlgOut) && /Done looks like: One page, 8 competitors\./.test(dlgOut) && (await inShadow(gpt, '#pd-use', 'this.disabled')) === false, JSON.stringify(dlgOut.slice(0, 100)));
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(200);
+  await panel.evaluate(() => chrome.storage.local.get('settings').then(({ settings }) => chrome.storage.local.set({ settings: { ...settings, improveMode: 'prompt' } }))); await gpt.waitForTimeout(200);
+  await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p><br></p>'; ed.focus(); });
+  await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(400);
+  log('empty chat box opens Improve on the Brief side', (await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.getAttribute("aria-pressed")')) === 'true' && (await inShadow(gpt, '#pd-brief', 'this.hidden')) === false && (await inShadow(gpt, '#pd-job', 'this.value')) === '');
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
   await ctx.unroute('https://chatgpt.com/**');

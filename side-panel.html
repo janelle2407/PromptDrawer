@@ -29,9 +29,25 @@
 </section>
 
 <section id="improve" class="improve" aria-label="Improve a prompt">
-  <p class="lead">Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.</p>
-  <label for="imp-in">Your rough request</label>
-  <textarea id="imp-in" placeholder="e.g. write an email to my landlord about the broken heater"></textarea>
+  <p class="lead" id="imp-lead">Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.</p>
+  <div class="seg" role="group" aria-label="Prompt or brief">
+    <button id="imp-mode-prompt" type="button" aria-pressed="true" title="Small job, or one you have already started: one rough line, tidied into a clear prompt">Prompt</button>
+    <button id="imp-mode-brief" type="button" aria-pressed="false" title="Bigger job: fill in the job, why, rules and what done looks like, get a long, detailed prompt">Brief</button>
+  </div>
+  <div id="imp-prompt-fields">
+    <label for="imp-in">Your rough request</label>
+    <textarea id="imp-in" placeholder="e.g. write an email to my landlord about the broken heater"></textarea>
+  </div>
+  <div id="imp-brief-fields" class="brief" hidden>
+    <label for="imp-job">The job</label>
+    <textarea id="imp-job" class="short" rows="2" placeholder="e.g. research competitor pricing"></textarea>
+    <label for="imp-why">Why</label>
+    <textarea id="imp-why" class="short" rows="2" placeholder="e.g. we are setting the price we compete with"></textarea>
+    <label for="imp-rules">Rules</label>
+    <textarea id="imp-rules" class="short" rows="2" placeholder="e.g. last 6 months only; Australian market; no guesses"></textarea>
+    <label for="imp-done">Done looks like</label>
+    <textarea id="imp-done" class="short" rows="2" placeholder="e.g. one page, 8 competitors, a table with sources"></textarea>
+  </div>
   <div class="row-btns">
     <button id="imp-grab" type="button" title="Copy whatever is typed in the chat box of the AI tab you are on">Grab what I'm typing</button>
     <button id="imp-go" class="primary" type="button">Improve</button>
@@ -61,9 +77,10 @@
   <ol class="steps">
     <li><strong>Open an AI chat</strong> (ChatGPT, Claude, Gemini, Perplexity or Copilot). Reload the tab if it was already open. A small <span class="pill-demo"><span class="p">P</span> Save · Improve</span> pill appears bottom-right.</li>
     <li><strong>Type something rough</strong> in the chat box. Then press <kbd>Alt</kbd>+<kbd>I</kbd> or click <strong>Improve</strong> on the pill. Check the result, press <strong>Use this</strong>.</li>
+    <li><strong>Prompt or Brief?</strong> A <strong>prompt</strong> is for a small job or one you have already started: one rough line, tidied up. A <strong>brief</strong> is for a bigger job: flip the switch at the top of Improve, fill in the job, why, rules and what done looks like, and you get a long, detailed prompt. Only the job is required.</li>
     <li><strong>Keep the good ones:</strong> press <kbd>Alt</kbd>+<kbd>S</kbd> to save what you typed. Find it later under <strong>My prompts</strong> and press <strong>Insert</strong>.</li>
     <li><strong>No AI tab open?</strong> Use the <strong>Improve</strong> tab here in the drawer, then Copy. Two chat boxes on one page? Click in the one you want first; PromptDrawer writes into the box you used last.</li>
-    <li><strong>Working on something bigger?</strong> Make a <strong>Project</strong> (top of the drawer): who it is for, what it is, how the AI should work. Pick it and every Improve knows the background. <strong>Brief the AI</strong> drops the whole thing into a fresh chat; <code>{{project}}</code> drops it into any saved prompt.</li>
+    <li><strong>Same background every time?</strong> Make a <strong>Project</strong> (top of the drawer): who it is for, what it is, how the AI should work. Pick it and every Improve knows the background. <strong>Brief the AI</strong> drops the whole thing into a fresh chat; <code>{{project}}</code> drops it into any saved prompt.</li>
   </ol>
   <p class="hint">Want real AI rewriting rather than a tidy-up? Pick "Ask the AI in this chat" (free) or add your own API key in Settings (⚙).</p>
   <div class="row-btns"><button id="help-welcome" type="button">Open the welcome page</button><button id="help-settings" type="button">Settings</button></div>
