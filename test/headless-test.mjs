@@ -55,7 +55,7 @@ try {
   await panel.click('#imp-go'); await panel.waitForTimeout(300);
   log('"No project" switches it off again', !/Project: Poppiwink/.test(await panel.inputValue('#imp-out')) && (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.activeProject === '');
   await panel.selectOption('#project-select', pjSettings.projects[0].id); await panel.waitForTimeout(200);
-  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 5);
+  await panel.click('#tab-help'); log('How-to tab shows steps', (await panel.locator('#help .steps li').count()) === 6);
   await panel.click('#tab-library');
   await panel.waitForSelector('#empty:not([hidden])', { timeout: 5000 });
   log('panel shows empty state with packs', (await panel.locator('#packs button').count()) === 3);

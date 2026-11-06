@@ -11,6 +11,11 @@
 - **Folders, tags, favourites, search, version history, JSON/Markdown export**, three starter packs.
 - **No account, no server, no analytics.** Open source core (MIT). Pro is a one-time key.
 
+## Prompt or brief?
+
+- **Prompt** is for a small job, or one you have already started: you type one rough line and PromptDrawer tidies it into a clear CIDI prompt.
+- **Brief** is for a bigger job. Flip the switch at the top of Improve and fill in four short boxes: *the job* (e.g. research competitor pricing), *why* (we are setting the price we compete with), *rules* (last 6 months only), *done looks like* (one page, 8 competitors). PromptDrawer writes the long, detailed prompt for you. No questions, only the job is required.
+
 ## Try it (unpacked)
 
 1. Download or clone this folder.
