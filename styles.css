@@ -69,6 +69,8 @@ kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px;
 .improve,.help{padding:0 14px 14px}
 .lead{margin:0 0 6px;font-size:13px;color:var(--muted)}
 .improve textarea{min-height:96px}#imp-out{min-height:200px}
+.improve textarea.short{min-height:40px;padding:6px 10px}.brief label{margin-top:6px}
+.seg{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}.seg button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer}.seg button[aria-pressed="true"]{background:var(--tint);border-color:var(--accent);color:var(--accent);font-weight:700}
 .row-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .result-head{display:flex;justify-content:space-between;align-items:end;gap:8px}.result-head label{margin-bottom:4px}
 .check.small{font-size:12px;font-weight:500;margin:0 0 4px}

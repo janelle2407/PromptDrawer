@@ -24,6 +24,7 @@ async function load() {
     let tab = 'improve'; try { tab = localStorage.getItem('pd-tab') || 'improve'; } catch { /* ignore */ }
     showTab(['improve', 'library', 'help'].includes(tab) ? tab : 'improve');
     $('#imp-engine').value = state.settings.engine || 'local'; engineHelp();
+    if ((state.settings.improveMode === 'brief' ? 'brief' : 'prompt') !== (state.improveMode || 'prompt')) setImproveMode(state.settings.improveMode === 'brief' ? 'brief' : 'prompt', { remember: false });
     const params = new URLSearchParams(location.search);
     if (params.get('tab')) showTab(params.get('tab'));
   }
@@ -313,18 +314,37 @@ async function grabTyping() {
   const r = await send({ type: 'pd:get-active-text' });
   if (!r?.ok) { report(r?.error === 'not-ai-tab' ? 'Switch to a ChatGPT, Claude, Gemini, Perplexity or Copilot tab first (or just type here).' : 'Reload the chat tab once, then try again.', 'error'); return false; }
   if (!r.text.trim()) { report(`Nothing typed in ${r.site} yet. Type here instead.`); return false; }
-  $('#imp-in').value = r.text; report(`Grabbed what you typed in ${r.site}.`, 'ok'); return true;
+  $(state.improveMode === 'brief' ? '#imp-job' : '#imp-in').value = r.text; report(`Grabbed what you typed in ${r.site}.`, 'ok'); return true;
 }
 $('#imp-grab').addEventListener('click', grabTyping);
+// Prompt = one rough line. Brief = four short boxes for a bigger job (the job, why, rules, done looks like).
+const BRIEF_KEYS = ['job', 'why', 'rules', 'done'];
+const readBrief = () => Object.fromEntries(BRIEF_KEYS.map(k => [k, $('#imp-' + k).value]));
+function setImproveMode(mode, { remember = true } = {}) {
+  state.improveMode = mode; state.improved = null; improveGen++;
+  $('#imp-mode-prompt').setAttribute('aria-pressed', String(mode === 'prompt')); $('#imp-mode-brief').setAttribute('aria-pressed', String(mode === 'brief'));
+  $('#imp-prompt-fields').hidden = mode === 'brief'; $('#imp-brief-fields').hidden = mode !== 'brief';
+  $('#imp-go').textContent = mode === 'brief' ? 'Write the prompt' : 'Improve';
+  $('#imp-lead').textContent = mode === 'brief'
+    ? 'Bigger job? Answer four quick questions and PromptDrawer writes the long, detailed CIDI prompt for you. Only the job is required.'
+    : 'Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.';
+  $('#imp-result').hidden = true;
+  if (mode === 'brief' && !$('#imp-job').value.trim() && $('#imp-in').value.trim()) $('#imp-job').value = $('#imp-in').value.trim();
+  if (remember && (state.settings.improveMode || 'prompt') !== mode) updateSettings({ improveMode: mode }).catch(() => {});
+}
+$('#imp-mode-prompt').addEventListener('click', () => setImproveMode('prompt'));
+$('#imp-mode-brief').addEventListener('click', () => setImproveMode('brief'));
 let improveGen = 0; // each runImprove() gets a number; a reply from an older run is ignored
 async function runImprove() {
+  const brief = state.improveMode === 'brief';
   const rough = $('#imp-in').value.trim();
-  if (!rough) return report('Type a rough request first.', 'error');
-  const go = $('#imp-go'); go.disabled = true; go.textContent = 'Improving…';
+  if (brief && !$('#imp-job').value.trim()) { $('#imp-job').focus(); return report('Say what the job is first (one line is enough).', 'error'); }
+  if (!brief && !rough) return report('Type a rough request first.', 'error');
+  const go = $('#imp-go'); go.disabled = true; go.textContent = brief ? 'Writing…' : 'Improving…';
   const my = ++improveGen;
-  const result = await send({ type: 'pd:improve', text: rough, engine: $('#imp-engine').value });
-  if (my !== improveGen) return; // the engine changed while this ran; the newer run owns the UI
-  go.disabled = false; go.textContent = 'Improve';
+  const result = await send(brief ? { type: 'pd:improve', brief: readBrief(), engine: $('#imp-engine').value } : { type: 'pd:improve', text: rough, engine: $('#imp-engine').value });
+  if (my !== improveGen) return; // the engine or mode changed while this ran; the newer run owns the UI
+  go.disabled = false; go.textContent = brief ? 'Write the prompt' : 'Improve';
   if (!result?.ok) return report('Could not improve: ' + (result?.error || 'no response'), 'error');
   state.improved = result;
   $('#imp-result').hidden = false;
@@ -336,13 +356,14 @@ async function runImprove() {
     const node = part.type === 'add' ? document.createElement('ins') : part.type === 'del' ? document.createElement('del') : document.createElement('span');
     node.textContent = part.text; diff.append(node);
   }
-  $('#imp-diff-toggle').disabled = result.mode === 'inchat';
+  $('#imp-diff-toggle').disabled = result.mode === 'inchat' || result.brief === true;
+  if ($('#imp-diff-toggle').disabled) { $('#imp-diff-toggle').checked = false; $('#imp-diff').hidden = true; $('#imp-out').hidden = false; }
   $('#imp-insert').textContent = result.mode === 'inchat' ? 'Put it in the chat box, then press Enter' : 'Put it in the chat box';
   if ($('#imp-engine').value !== result.engine) { $('#imp-engine').value = result.engine; engineHelp(); }
   $('#imp-out').focus();
 }
 $('#imp-go').addEventListener('click', runImprove);
-$('#imp-in').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runImprove(); });
+for (const id of ['#imp-in', '#imp-job', '#imp-why', '#imp-rules', '#imp-done']) $(id).addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runImprove(); });
 $('#imp-diff-toggle').addEventListener('change', e => { $('#imp-diff').hidden = !e.target.checked; $('#imp-out').hidden = e.target.checked; });
 $('#imp-copy').addEventListener('click', async () => { await navigator.clipboard.writeText($('#imp-out').value); report('Copied. Paste it into any AI chat.', 'ok'); });
 $('#imp-insert').addEventListener('click', async () => {

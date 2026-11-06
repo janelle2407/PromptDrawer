@@ -160,6 +160,7 @@
     label{display:block;font-weight:600;font-size:12px;margin:10px 0 4px;color:#374151}
     input,textarea,select{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;background:#fff;font:inherit}
     textarea{min-height:120px;resize:vertical;white-space:pre-wrap}
+    textarea.short{min-height:44px;padding:6px 10px}.brief label{margin:8px 0 3px}
     .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
     .btn{border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer}
     .btn:hover{background:#f3f4f6}.btn.primary{background:#4f46e5;border-color:#4f46e5;color:#fff}.btn.primary:hover{background:#4338ca}
@@ -266,23 +267,46 @@
   // --- Improve -------------------------------------------------------------
   const ENGINES = [['local', 'Quick tidy-up'], ['inchat', 'Ask this AI'], ['nano', 'Chrome AI'], ['byok', 'My API key']];
   const ENGINE_HELP = {
-    local: 'No AI: wraps your request in a clear structure (role, task, format). Instant, works offline.',
+    local: 'No AI: lays your request out in the CIDI structure (Context, Instructions, Details, Input). Instant, works offline.',
     inchat: 'Turns your request into a message that asks this AI to write a better prompt for you. Free.',
     nano: "Chrome's small built-in model, on your device. Needs Chrome 138+; the first run downloads it.",
     byok: 'Your own Anthropic / OpenAI / Google key from Settings. Best quality.',
   };
-  async function openImprove(prefill) {
+  // Brief mode: four short boxes (job, why, rules, done) for bigger jobs.
+  const BRIEF_FIELDS = [
+    ['job', 'The job', 'e.g. research competitor pricing'],
+    ['why', 'Why', 'e.g. we are setting the price we compete with'],
+    ['rules', 'Rules', 'e.g. last 6 months only; Australian market; no guesses'],
+    ['done', 'Done looks like', 'e.g. one page, 8 competitors, a table with sources'],
+  ];
+  const HINT_PROMPT = 'You can edit the result. Nothing changes in the chat box until you press Use this.';
+  const HINT_INCHAT = 'This is a message asking the AI to improve your request. Press Use this, then Enter, and copy what the AI replies.';
+  const HINT_BRIEF = 'Fill in the four boxes (short is fine), then press Write the prompt. Only the job is required.';
+  async function openImprove(prefill, startMode) {
     const rough = (prefill ?? readComposer()).trim();
-    if (!rough) { toast('Type a rough request in the chat box first, then press Improve.'); return; }
     const settings = (await chrome.storage.local.get({ settings: {} }).catch(() => ({ settings: {} }))).settings || {};
     let engine = settings.engine || 'local';
+    // Nothing typed yet? Open straight on the Brief side, so there is still something useful to do.
+    let mode = startMode || (rough ? (settings.improveMode === 'brief' ? 'brief' : 'prompt') : 'brief');
     let current = null;
     let gen = 0; // each run() gets a number; a reply from an older run is ignored
     const card = dialog('Improve prompt', card => {
+      const modeSeg = el('div', { class: 'seg', id: 'pd-modes', role: 'group', 'aria-label': 'Prompt or brief' });
+      for (const [id, label, title] of [['prompt', 'Prompt', 'One rough line, tidied into a clear prompt'], ['brief', 'Brief', 'Bigger job: the job, why, rules and what done looks like']]) {
+        modeSeg.append(el('button', { text: label, title, 'aria-pressed': String(id === mode), 'data-mode': id, onclick: () => setMode(id) }));
+      }
       const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'How to improve it' });
-      for (const [id, label] of ENGINES) seg.append(el('button', { text: label, 'aria-pressed': String(id === engine), 'data-engine': id, onclick: () => { engine = id; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === id))); help.textContent = ENGINE_HELP[id]; run(); } }));
+      for (const [id, label] of ENGINES) seg.append(el('button', { text: label, 'aria-pressed': String(id === engine), 'data-engine': id, onclick: () => { engine = id; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === id))); help.textContent = ENGINE_HELP[id]; if (mode === 'prompt' || current) run(); } }));
       const help = el('p', { class: 'muted', id: 'pd-engine-help', text: ENGINE_HELP[engine] });
-      const out = el('textarea', { id: 'pd-out', 'aria-label': 'Improved prompt', spellcheck: 'true' }); out.value = 'Improving…';
+      const brief = el('div', { class: 'brief', id: 'pd-brief', hidden: '' });
+      for (const [key, label, placeholder] of BRIEF_FIELDS) {
+        const field = el('textarea', { id: 'pd-' + key, class: 'short', placeholder, rows: '2', 'aria-label': label });
+        if (key === 'job') field.value = rough;
+        brief.append(el('label', { for: 'pd-' + key, text: label }), field);
+      }
+      const briefGo = el('button', { class: 'btn primary', id: 'pd-brief-go', text: 'Write the prompt', onclick: () => run() });
+      brief.append(el('div', { class: 'actions', style: 'margin-top:8px;justify-content:flex-start' }, [briefGo]));
+      const out = el('textarea', { id: 'pd-out', 'aria-label': 'Improved prompt', spellcheck: 'true' });
       const diff = el('div', { class: 'diff', id: 'pd-diff', 'aria-live': 'polite', hidden: '' });
       const toggle = el('label', { class: 'muted', id: 'pd-toggle-wrap' }, [el('input', { type: 'checkbox', id: 'pd-toggle', onchange: (e) => { diff.hidden = !e.target.checked; out.hidden = e.target.checked; } }), document.createTextNode(' Show what changed')]);
       const note = el('div', { class: 'note', id: 'pd-note', hidden: '' });
@@ -290,7 +314,8 @@
       const save = el('button', { class: 'btn', id: 'pd-save-improved', text: 'Save to drawer', disabled: '', onclick: async () => { const r = await send({ type: 'pd:save', body: out.value, folder: 'Inbox' }); toast(r?.ok ? 'Saved to PromptDrawer.' : 'Could not save.'); } });
       const copy = el('button', { class: 'btn', text: 'Copy', onclick: () => navigator.clipboard?.writeText(out.value).then(() => toast('Copied.')) });
       const cancel = el('button', { class: 'btn', text: 'Cancel', onclick: closeDialog });
-      card.append(seg, help, out, diff, toggle, note, el('p', { class: 'muted', id: 'pd-hint', text: 'You can edit the result. Nothing changes in the chat box until you press Use this.' }), el('div', { class: 'actions' }, [cancel, copy, save, use]));
+      card.append(modeSeg, seg, help, brief, out, diff, toggle, note, el('p', { class: 'muted', id: 'pd-hint', text: HINT_PROMPT }), el('div', { class: 'actions' }, [cancel, copy, save, use]));
+      brief.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run(); } });
       use.addEventListener('click', async () => {
         if (!current) return;
         const improved = out.value;
@@ -302,12 +327,29 @@
         toast(message, { action: 'Undo', onAction: () => writeComposer(rough, { replace: true }), ms: 9000 });
       });
     });
+    const q = sel => card.querySelector(sel);
+    const readBrief = () => Object.fromEntries(BRIEF_FIELDS.map(([key]) => [key, q('#pd-' + key).value]));
+    // Switches between the one-line Prompt side and the four-box Brief side. Remembered for next time.
+    function setMode(next) {
+      mode = next; gen++; current = null;
+      card.querySelectorAll('#pd-modes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === next)));
+      q('#pd-brief').hidden = next !== 'brief';
+      q('#pd-toggle-wrap').hidden = next === 'brief';
+      q('#pd-toggle').checked = false; q('#pd-diff').hidden = true; q('#pd-out').hidden = false; q('#pd-note').hidden = true;
+      q('#pd-use').disabled = true; q('#pd-save-improved').disabled = true;
+      chrome.storage.local.get({ settings: {} }).then(({ settings }) => chrome.storage.local.set({ settings: { ...(settings || {}), improveMode: next } })).catch(() => {});
+      if (next === 'brief') { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Your long, detailed prompt appears here.'; q('#pd-hint').textContent = HINT_BRIEF; (q('#pd-job').value ? q('#pd-why') : q('#pd-job')).focus(); }
+      else if (rough) { q('#pd-hint').textContent = HINT_PROMPT; run(); }
+      else { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Type something in the chat box first, or switch to Brief.'; q('#pd-hint').textContent = 'Nothing is typed in the chat box yet. Close this, type a rough request, then press Improve again.'; }
+    }
     const run = async () => {
-      const out = card.querySelector('#pd-out'), diff = card.querySelector('#pd-diff'), note = card.querySelector('#pd-note'), use = card.querySelector('#pd-use'), save = card.querySelector('#pd-save-improved'), toggle = card.querySelector('#pd-toggle');
+      const out = q('#pd-out'), diff = q('#pd-diff'), note = q('#pd-note'), use = q('#pd-use'), save = q('#pd-save-improved'), toggle = q('#pd-toggle');
+      const payload = mode === 'brief' ? { type: 'pd:improve', brief: readBrief(), engine } : { type: 'pd:improve', text: rough, engine };
+      if (mode === 'brief' && !payload.brief.job.trim()) { q('#pd-hint').textContent = 'Say what the job is first (one line is enough).'; q('#pd-job').focus(); return; }
       out.value = 'Improving…'; use.disabled = true; save.disabled = true; note.hidden = true; current = null;
       const my = ++gen;
-      const result = await send({ type: 'pd:improve', text: rough, engine });
-      if (my !== gen || !card.isConnected) return; // a newer engine was picked (or the dialog closed) while this ran
+      const result = await send(payload);
+      if (my !== gen || !card.isConnected) return; // a newer engine or mode was picked (or the dialog closed) while this ran
       if (!result?.ok) { out.value = 'Something went wrong: ' + (result?.error || 'no response') + '. Reload this tab and try again.'; return; }
       current = result;
       out.value = result.improved;
@@ -316,17 +358,15 @@
         const node = part.type === 'add' ? document.createElement('ins') : part.type === 'del' ? document.createElement('del') : document.createElement('span');
         node.textContent = part.text; diff.append(node);
       }
-      card.querySelector('#pd-toggle-wrap').hidden = result.mode === 'inchat';
-      if (result.mode === 'inchat') { toggle.checked = false; diff.hidden = true; out.hidden = false; }
-      card.querySelector('#pd-hint').textContent = result.mode === 'inchat'
-        ? 'This is a message asking the AI to improve your request. Press Use this, then Enter, and copy what the AI replies.'
-        : 'You can edit the result. Nothing changes in the chat box until you press Use this.';
+      q('#pd-toggle-wrap').hidden = result.mode === 'inchat' || mode === 'brief';
+      if (result.mode === 'inchat' || mode === 'brief') { toggle.checked = false; diff.hidden = true; out.hidden = false; }
+      q('#pd-hint').textContent = result.mode === 'inchat' ? HINT_INCHAT : mode === 'brief' ? 'Your brief, written out as a full prompt. Edit anything, then press Use this.' : HINT_PROMPT;
       if (result.note) { note.textContent = result.note; note.hidden = false; }
-      const pressed = card.querySelector('.seg button[aria-pressed="true"]');
-      if (pressed && pressed.dataset.engine !== result.engine) { card.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === result.engine))); card.querySelector('#pd-engine-help').textContent = ENGINE_HELP[result.engine]; }
+      const pressed = q('.seg button[aria-pressed="true"][data-engine]');
+      if (pressed && pressed.dataset.engine !== result.engine) { card.querySelectorAll('.seg button[data-engine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === result.engine))); q('#pd-engine-help').textContent = ENGINE_HELP[result.engine]; }
       use.disabled = false; save.disabled = false; use.focus();
     };
-    run();
+    setMode(mode);
     markTipSeen();
   }
 

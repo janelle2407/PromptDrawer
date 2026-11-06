@@ -5,6 +5,7 @@
 - **Save** what you are typing with `Alt+S` (or the small toolbar, or the right-click menu).
 - **Insert** any saved prompt into the chat you have open. `{{blanks}}` get filled in as you go.
 - **Improve** a rough line with `Alt+I` into a CIDI prompt (Context, Instructions, Details, Input): see a before/after diff, press *Use this*, and *Undo* if you change your mind. Works offline (instant structure), or asks the AI you are already talking to (free), or uses Chrome's on-device model or your own API key (Pro).
+- **Brief mode** for bigger jobs: flip Improve to *Brief*, answer four short boxes (the job, why, rules, done looks like) and get a long, detailed CIDI prompt. No questions, only the job is required.
 - **Projects**: a reusable brief (context + instructions) that Improve folds into every rewrite, in every AI. One click to brief a new chat; `{{project}}` inside any saved prompt. Two free, unlimited with Pro.
 - **Ask all three**: send one prompt to every open AI tab and compare the answers (Pro).
 - **Folders, tags, favourites, search, version history, JSON/Markdown export**, three starter packs.

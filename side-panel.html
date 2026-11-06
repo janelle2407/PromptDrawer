@@ -29,9 +29,25 @@
 </section>
 
 <section id="improve" class="improve" aria-label="Improve a prompt">
-  <p class="lead">Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.</p>
-  <label for="imp-in">Your rough request</label>
-  <textarea id="imp-in" placeholder="e.g. write an email to my landlord about the broken heater"></textarea>
+  <p class="lead" id="imp-lead">Type a rough request. PromptDrawer turns it into a CIDI prompt (Context, Instructions, Details, Input) the AI can act on well.</p>
+  <div class="seg" role="group" aria-label="Prompt or brief">
+    <button id="imp-mode-prompt" type="button" aria-pressed="true" title="One rough line, tidied into a clear prompt">Prompt</button>
+    <button id="imp-mode-brief" type="button" aria-pressed="false" title="Bigger job: the job, why, rules and what done looks like">Brief</button>
+  </div>
+  <div id="imp-prompt-fields">
+    <label for="imp-in">Your rough request</label>
+    <textarea id="imp-in" placeholder="e.g. write an email to my landlord about the broken heater"></textarea>
+  </div>
+  <div id="imp-brief-fields" class="brief" hidden>
+    <label for="imp-job">The job</label>
+    <textarea id="imp-job" class="short" rows="2" placeholder="e.g. research competitor pricing"></textarea>
+    <label for="imp-why">Why</label>
+    <textarea id="imp-why" class="short" rows="2" placeholder="e.g. we are setting the price we compete with"></textarea>
+    <label for="imp-rules">Rules</label>
+    <textarea id="imp-rules" class="short" rows="2" placeholder="e.g. last 6 months only; Australian market; no guesses"></textarea>
+    <label for="imp-done">Done looks like</label>
+    <textarea id="imp-done" class="short" rows="2" placeholder="e.g. one page, 8 competitors, a table with sources"></textarea>
+  </div>
   <div class="row-btns">
     <button id="imp-grab" type="button" title="Copy whatever is typed in the chat box of the AI tab you are on">Grab what I'm typing</button>
     <button id="imp-go" class="primary" type="button">Improve</button>
