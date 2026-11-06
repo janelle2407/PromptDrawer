@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Prompt-quality eval (`test/prompt-eval.mjs`): 35 labelled fixtures with golden snapshots. 0.3.0 baseline: 1/35 pass; every miss is the always-on clarifying line (26) or a one-size-fits-all prompt that is too long for a small job (15). Facts are never dropped and nothing is invented. 0.4.0 must bring this to 35/35.
+
 ## 0.3.0 (2026-11-06)
 
 - **Brief mode** for bigger jobs (Janelle's idea). A Prompt / Brief toggle at the top of Improve (on chat sites and in the drawer). Brief shows four short boxes: **The job**, **Why**, **Rules**, **Done looks like**. The job is pre-filled with whatever you had typed. Press *Write the prompt* and you get the long CIDI version: Why becomes the Context, the job the Instructions, each rule its own Details line, plus a "Done looks like" line the AI must check its answer against. Works on all four engines; no questions asked, only the job is required.

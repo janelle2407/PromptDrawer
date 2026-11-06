@@ -1,0 +1,5 @@
+{
+  "_note": "Words the improver's own template is allowed to add (labels, sentence starters, format wording). Everything else capitalised or numeric must come from the person's input. Keep this list short; a real name or number never belongs here.",
+  "words": ["Context", "Instructions", "Details", "Input", "Tone", "Output", "Done", "Why", "About", "Out", "Be", "Before", "Check", "Clear", "Do", "If", "Keep", "Leave", "Otherwise", "Use", "The", "A", "An", "You", "Three", "Numbered", "Ask", "Return", "Not", "No", "Paste"],
+  "numbers": []
+}

@@ -48,6 +48,8 @@ Manifest V3, plain JavaScript modules, no build step.
 
 `config.js` has `TEST_MODE_PRO = true` so testers get every feature. Set it to `false` for a public build.
 
+Tests: `node test/headless-test.mjs` drives the extension in headless Chromium (59 checks). `node test/prompt-eval.mjs` scores the offline improver against 35 labelled rough prompts and briefs (facts kept, nothing invented, length fits the job, clarifying line only when something is missing) and compares every output with its snapshot in `test/golden/`; run it with `--update` after a deliberate change and review the diff.
+
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md). Short version: nothing leaves your browser unless you add your own API key (then your prompt goes to that provider only) or paste a licence key (then the key goes to the licence server only).

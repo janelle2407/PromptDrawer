@@ -1,0 +1,17 @@
+Context: You are a business strategist. Why this matters: We are setting the price we compete with.
+
+Instructions: Research competitor pricing.
+
+Details:
+- Last 6 months only.
+- Australian market.
+- No guesses.
+- Be specific and concrete. Use real examples and sources rather than generalities.
+- Do not pad. Leave out caveats and introductions I did not ask for.
+- If a fact is uncertain, say so instead of guessing.
+- Output format: A table.
+- Done looks like: One page, 8 competitors, a table with sources. Check your answer against this before you reply.
+- Before you start: if anything important is missing or ambiguous, ask me up to three short clarifying questions first. Otherwise, go ahead.
+
+Input:
+(paste the text, notes or data to work from here, if any)
