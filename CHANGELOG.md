@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 (2026-11-06)
+
+Four fixes from the Cursor Bugbot review of 0.3.0.
+- **Drawer Improve button no longer sticks.** Switching Prompt/Brief while an Improve was still running left the button greyed out until the drawer was reloaded.
+- **An empty chat box no longer changes your remembered side.** Pressing Improve with nothing typed opens Brief (as before) but only a click on Prompt or Brief is remembered.
+- **First-run settings cannot overwrite each other.** The "tip seen" and "last side used" writes on the first Improve went through at the same time and one could be lost; they now go one after the other.
+- **Rules that start with a number keep the number.** "10 pages max" or "3 sources only" in the Rules box used to lose the number; only real list markers ("- ", "1. ", "2) ") are stripped now.
+
 ## 0.3.0 (2026-11-06)
 
 - **Brief mode** for bigger jobs (Janelle's idea). A Prompt / Brief toggle at the top of Improve (on chat sites and in the drawer). Brief shows four short boxes: **The job**, **Why**, **Rules**, **Done looks like**. The job is pre-filled with whatever you had typed. Press *Write the prompt* and you get the long CIDI version: Why becomes the Context, the job the Instructions, each rule its own Details line, plus a "Done looks like" line the AI must check its answer against. Works on all four engines; no questions asked, only the job is required.

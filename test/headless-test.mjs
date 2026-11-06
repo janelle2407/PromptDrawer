@@ -1,5 +1,6 @@
 import pw from '/opt/node-tools/node_modules/playwright/index.js'; const { chromium } = pw;
 import fs from 'node:fs';
+import { splitRules } from '../lib/improver.js';
 const EXT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const userData = '/tmp/claude-0/-home-user/e3bcbd6b-ae7f-5919-a1b3-1c00faf18e9d/scratchpad/pdtest/profile';
 fs.rmSync(userData, { recursive: true, force: true });
@@ -10,6 +11,9 @@ const ctx = await chromium.launchPersistentContext(userData, {
 const results = [];
 const log = (name, ok, extra = '') => { results.push({ name, ok, extra }); console.log((ok ? 'PASS' : 'FAIL') + ' ' + name + (extra ? ' :: ' + extra : '')); };
 try {
+  // --- 0.3.1: list markers are stripped from rules, numbers that belong to the rule are kept ---
+  const rulesOut = splitRules('10 pages max; 1. cite sources\n- no guesses; 3.5 hours max; 2) Australian market');
+  log('rule splitter keeps leading numbers, drops list markers', JSON.stringify(rulesOut) === JSON.stringify(['10 pages max', 'cite sources', 'no guesses', '3.5 hours max', 'Australian market']), JSON.stringify(rulesOut));
   let [sw] = ctx.serviceWorkers();
   if (!sw) sw = await ctx.waitForEvent('serviceworker', { timeout: 15000 });
   const id = new URL(sw.url()).host;
@@ -240,6 +244,12 @@ try {
   await panel.waitForTimeout(1500);
   const raceOut = await panel.inputValue('#imp-out'); const raceEngine = await panel.inputValue('#imp-engine'); const raceBtn = await panel.textContent('#imp-go');
   log('late reply from an older engine is ignored (panel)', raceEngine === 'local' && /Context:/.test(raceOut) && !/better prompt|improve/i.test(raceOut.split('\n')[0]) && raceBtn.trim() === 'Improve', JSON.stringify({ raceEngine, first: raceOut.split('\n')[0], raceBtn }));
+  // --- 0.3.1: switching Prompt/Brief while an Improve is still running must hand the button back ---
+  await panel.selectOption('#imp-engine', 'inchat'); await panel.waitForTimeout(100); // the slow (900 ms) engine; state.improved is set so this starts a run
+  await panel.click('#imp-mode-brief'); await panel.waitForTimeout(100);
+  const stuckNow = await panel.isDisabled('#imp-go'); await panel.waitForTimeout(1200); const stuckLater = await panel.isDisabled('#imp-go');
+  log('mode switch mid-Improve re-enables the drawer button', !stuckNow && !stuckLater && (await panel.textContent('#imp-go')).trim() === 'Write the prompt' && (await panel.isHidden('#imp-result')), JSON.stringify({ stuckNow, stuckLater }));
+  await panel.click('#imp-mode-prompt'); await panel.waitForTimeout(200);
   // --- 0.3.0: Brief mode in the drawer (four boxes -> long CIDI prompt) ---
   await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', brief: { job: '   ' }, engine: 'local' })).then(r => log('brief without a job is refused', r?.ok === false && r.error === 'empty', JSON.stringify(r)));
   await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(200);
@@ -273,6 +283,10 @@ try {
   await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p><br></p>'; ed.focus(); });
   await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(400);
   log('empty chat box opens Improve on the Brief side', (await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.getAttribute("aria-pressed")')) === 'true' && (await inShadow(gpt, '#pd-brief', 'this.hidden')) === false && (await inShadow(gpt, '#pd-job', 'this.value')) === '');
+  const afterEmpty = (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings;
+  log('empty-box Brief does not overwrite the remembered Prompt side, and tipSeen survives', afterEmpty.improveMode === 'prompt' && afterEmpty.tipSeen === true, JSON.stringify({ improveMode: afterEmpty.improveMode, tipSeen: afterEmpty.tipSeen }));
+  await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(300);
+  log('clicking Brief in the dialog is remembered', (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.improveMode === 'brief');
   await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
