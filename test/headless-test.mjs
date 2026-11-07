@@ -307,6 +307,27 @@ try {
   await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(300);
   log('clicking Brief in the dialog is remembered', (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.improveMode === 'brief');
   await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
+  // --- 0.3.3: the Input line is a plain statement, and paste/copy/cut work inside the dialog even when the site hijacks clipboard events ---
+  await panel.evaluate(() => chrome.storage.local.get('settings').then(({ settings }) => chrome.storage.local.set({ settings: { ...settings, improveMode: 'prompt', engine: 'local' } }))); await gpt.waitForTimeout(200);
+  await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p>write a poem about cats</p>'; ed.focus(); });
+  await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(400);
+  const inputLineOut = await inShadow(gpt, '#pd-out', 'this.value');
+  log('Input line is a statement the AI understands (no "(paste ...)" placeholder)', /\nInput: none provided\. Work from the details above\.$/.test(inputLineOut) && !/paste the text/.test(inputLineOut), JSON.stringify(inputLineOut.split('\n').slice(-2)));
+  log('dialog hint tells the person where to paste their material', /Paste it over the Input line/.test(await inShadow(gpt, '#pd-hint', 'this.textContent')));
+  await gpt.evaluate(() => { window.hijacked = 0; for (const t of ['paste', 'copy', 'cut']) document.addEventListener(t, (e) => { window.hijacked++; e.preventDefault(); }, true); });
+  await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(200);
+  await inShadow(gpt, '#pd-job', 'this.value = "", true');
+  const pasted = await inShadow(gpt, '#pd-job', `(this.focus(), this.dispatchEvent(Object.assign(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', 'pasted from clipboard'); return d; })(), bubbles: true, composed: true, cancelable: true }), {})), this.value)`);
+  log('paste lands in the dialog box, not in the site composer', pasted === 'pasted from clipboard' && (await gpt.evaluate(() => window.hijacked)) === 0 && !(await gpt.evaluate(() => document.getElementById('prompt-textarea').innerText)).includes('pasted from'), JSON.stringify({ pasted, hijacked: await gpt.evaluate(() => window.hijacked) }));
+  const pastedTwice = await inShadow(gpt, '#pd-job', `(this.focus(), this.setSelectionRange(this.value.length, this.value.length), this.dispatchEvent(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', ' and more'); return d; })(), bubbles: true, composed: true, cancelable: true })), this.value)`);
+  log('a second paste appends at the caret', pastedTwice === 'pasted from clipboard and more', JSON.stringify(pastedTwice));
+  const copied = await inShadow(gpt, '#pd-job', `(() => { this.focus(); this.setSelectionRange(0, 6); const d = new DataTransfer(); this.dispatchEvent(new ClipboardEvent('copy', { clipboardData: d, bubbles: true, composed: true, cancelable: true })); return [d.getData('text/plain'), this.value]; })()`);
+  log('copy takes the selected text from the dialog box', copied?.[0] === 'pasted' && copied?.[1] === 'pasted from clipboard and more' && (await gpt.evaluate(() => window.hijacked)) === 0, JSON.stringify(copied));
+  const cutRes = await inShadow(gpt, '#pd-job', `(() => { this.focus(); this.setSelectionRange(0, 7); const d = new DataTransfer(); this.dispatchEvent(new ClipboardEvent('cut', { clipboardData: d, bubbles: true, composed: true, cancelable: true })); return [d.getData('text/plain'), this.value]; })()`);
+  log('cut removes the selected text and puts it on the clipboard', cutRes?.[0] === 'pasted ' && cutRes?.[1] === 'from clipboard and more' && (await gpt.evaluate(() => window.hijacked)) === 0, JSON.stringify(cutRes));
+  await gpt.evaluate(() => { document.getElementById('prompt-textarea').dispatchEvent(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', 'site paste'); return d; })(), bubbles: true, composed: true, cancelable: true })); });
+  log('a paste outside the dialog still reaches the site', (await gpt.evaluate(() => window.hijacked)) === 1);
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();
   await ctx.unroute('https://chatgpt.com/**');
