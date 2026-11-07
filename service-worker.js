@@ -4,7 +4,7 @@ import { PRO_FEATURES } from './config.js';
 import { wordDiff } from './lib/diff.js';
 import { improveWithByok, improveWithNano, nanoAvailability } from './lib/engines.js';
 import { buildBriefMetaPrompt, buildContext, buildMetaPrompt, briefToText, localBrief, localImprove, normaliseBrief } from './lib/improver.js';
-import { isPro } from './lib/license.js';
+import { ensureTrial, isPro } from './lib/license.js';
 import { bumpUse, getActiveProject, getSettings, projectBrief, savePrompt, titleFrom } from './lib/storage.js';
 import { LIMITS } from './config.js';
 
@@ -21,6 +21,7 @@ const siteFor = (url) => { try { const host = new URL(url).hostname; return SITE
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   if (details?.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }).catch(() => {});
+  ensureTrial().catch(() => {}); // the free Pro trial clock starts now (a no-op on updates where it already runs)
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({ id: 'pd-save-selection', title: 'Save selection to PromptDrawer', contexts: ['selection'] });
     chrome.contextMenus.create({ id: 'pd-improve-selection', title: 'Improve selection with PromptDrawer', contexts: ['selection'], documentUrlPatterns: ALL_PATTERNS });

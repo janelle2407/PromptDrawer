@@ -56,6 +56,7 @@ kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px;
 .site-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}.site-row input{width:auto}.site-row .state{margin-left:auto;font-size:11px;color:var(--muted)}
 .check{display:flex;align-items:center;gap:8px;font-weight:500;font-size:13px}.check input{width:auto}
 .pro-note{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:8px;padding:8px 10px;font-size:12px;margin:8px 0}
+.trial-note{margin:0 14px 8px}.trial-note button.link{display:inline;padding:0;min-height:auto;font-size:12px;font-weight:700}
 .section{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:16px;margin-top:16px}
 .section p{color:var(--muted);font-size:13px;margin:4px 0 8px}
 .section .actions{justify-content:flex-start}

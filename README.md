@@ -9,7 +9,7 @@
 - **Projects**: a reusable brief (context + instructions) that Improve folds into every rewrite, in every AI. One click to brief a new chat; `{{project}}` inside any saved prompt. Two free, unlimited with Pro.
 - **Ask all three**: send one prompt to every open AI tab and compare the answers (Pro).
 - **Folders, tags, favourites, search, version history, JSON/Markdown export**, three starter packs.
-- **No account, no server, no analytics.** Open source core (MIT). Pro is a one-time key.
+- **No account, no server, no analytics.** Open source core (MIT). Every install gets a 7-day free Pro trial (no card); after that Pro is a one-time $4.99 key, or carry on with the free plan.
 
 ## Prompt or brief?
 
@@ -42,9 +42,9 @@ Manifest V3, plain JavaScript modules, no build step.
 | `lib/storage.js` | All data in `chrome.storage.local`. API keys live in a separate key so exports never include them. |
 | `lib/improver.js` | The instant offline improver and the in-chat meta-prompt. |
 | `lib/engines.js` | Chrome built-in AI (Prompt API) and bring-your-own-key calls. |
-| `lib/license.js` | Pro key check against the store's public licence API. |
+| `lib/license.js` | Pro key check against the store's public licence API, plus the 7-day free trial clock (`trialStatus`, `getProStatus`). |
 | `lib/packs.js` | Starter packs. |
-| `config.js` | Pricing links, which features are Pro, test-mode switch. |
+| `config.js` | Price, trial length, checkout link, which features are Pro, test-mode switch. |
 
 `config.js` has `TEST_MODE_PRO = true` so testers get every feature. Set it to `false` for a public build.
 
