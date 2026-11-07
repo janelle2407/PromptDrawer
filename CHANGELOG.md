@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2 (2026-11-07)
+
+Pricing: one-time $4.99, with a free 7-day Pro trial on every install. No card, no account.
+- **7-day free Pro trial.** Every install gets every Pro feature for 7 days. The clock starts the first time the extension checks Pro on a device (install, or the first open after updating to 0.3.2). Nothing to enter.
+- **Countdown in the drawer and settings.** The badge under the name reads "Trial · N days left", with a one-line "Keep Pro for $4.99" link. When the trial ends you drop to the free plan; everything you saved stays. The end-of-trial line can be hidden.
+- **Upsell copy updated.** "Keep Pro for $4.99", one-time, no subscription, 7-day refund. A licence key still wins over the trial, and removing a key or deleting your data does not restart the trial.
+- Config: `PRO_PRICE` and `TRIAL_DAYS` in `config.js`; new `trial` storage key; `getProStatus()` in `lib/license.js` says what unlocks Pro (licence, trial, or test build).
+
 ## 0.3.1 (2026-11-06)
 
 Four fixes from the Cursor Bugbot review of 0.3.0.

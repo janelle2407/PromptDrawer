@@ -8,6 +8,13 @@ export const TEST_MODE_PRO = true;
 // product exists. The extension never sends anything here by itself.
 export const CHECKOUT_URL = 'https://promptdrawer.lemonsqueezy.com/';
 
+// Shown in the drawer, settings and upsell. Change the price here and nowhere else.
+export const PRO_PRICE = '$4.99';
+
+// Every install gets this many days of Pro for free, no card, no account.
+// The trial starts the first time the extension checks Pro status on a device.
+export const TRIAL_DAYS = 7;
+
 // Lemon Squeezy licence endpoints. Used only when a person pastes a key.
 export const LICENSE_VALIDATE_URL = 'https://api.lemonsqueezy.com/v1/licenses/validate';
 export const LICENSE_ACTIVATE_URL = 'https://api.lemonsqueezy.com/v1/licenses/activate';
