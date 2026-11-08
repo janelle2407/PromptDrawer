@@ -14,6 +14,7 @@
     <button id="settings" class="icon" title="Settings" aria-label="Settings">⚙</button>
   </div>
 </header>
+<p id="trial-note" class="pro-note trial-note" hidden></p>
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button id="tab-improve" role="tab" aria-selected="true" aria-controls="improve">Improve</button>
@@ -63,6 +64,7 @@
   <div id="imp-result" hidden>
     <div class="result-head"><label for="imp-out">Improved prompt (you can edit it)</label><label class="check small"><input type="checkbox" id="imp-diff-toggle"> Show changes</label></div>
     <textarea id="imp-out" spellcheck="true"></textarea>
+    <p class="hint">Have text or data for the AI? Paste it over the Input line at the end.</p>
     <div id="imp-diff" class="diff" hidden aria-live="polite"></div>
     <p id="imp-note" class="pro-note" hidden></p>
     <div class="row-btns">

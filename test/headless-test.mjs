@@ -1,5 +1,7 @@
 import pw from '/opt/node-tools/node_modules/playwright/index.js'; const { chromium } = pw;
 import fs from 'node:fs';
+import { splitRules } from '../lib/improver.js';
+import { trialStatus } from '../lib/license.js';
 const EXT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const userData = '/tmp/claude-0/-home-user/e3bcbd6b-ae7f-5919-a1b3-1c00faf18e9d/scratchpad/pdtest/profile';
 fs.rmSync(userData, { recursive: true, force: true });
@@ -10,6 +12,16 @@ const ctx = await chromium.launchPersistentContext(userData, {
 const results = [];
 const log = (name, ok, extra = '') => { results.push({ name, ok, extra }); console.log((ok ? 'PASS' : 'FAIL') + ' ' + name + (extra ? ' :: ' + extra : '')); };
 try {
+  // --- 0.3.1: list markers are stripped from rules, numbers that belong to the rule are kept ---
+  const rulesOut = splitRules('10 pages max; 1. cite sources\n- no guesses; 3.5 hours max; 2) Australian market');
+  log('rule splitter keeps leading numbers, drops list markers', JSON.stringify(rulesOut) === JSON.stringify(['10 pages max', 'cite sources', 'no guesses', '3.5 hours max', 'Australian market']), JSON.stringify(rulesOut));
+  // --- 0.3.2: the free Pro trial clock (pure function, no browser needed) ---
+  const DAY = 86400000, now = Date.now();
+  const tFresh = trialStatus({ startedAt: new Date(now).toISOString() }, now);
+  const tLate = trialStatus({ startedAt: new Date(now - 6.5 * DAY).toISOString() }, now);
+  const tOver = trialStatus({ startedAt: new Date(now - 8 * DAY).toISOString() }, now);
+  const tNone = trialStatus({ startedAt: '' }, now);
+  log('trial clock: fresh = 7 days, day 6.5 = 1 day, day 8 = over, unset = not started', tFresh.active && tFresh.daysLeft === 7 && tLate.active && tLate.daysLeft === 1 && !tOver.active && tOver.daysLeft === 0 && tOver.started && !tNone.started && !tNone.active, JSON.stringify({ tFresh, tLate, tOver, tNone }));
   let [sw] = ctx.serviceWorkers();
   if (!sw) sw = await ctx.waitForEvent('serviceworker', { timeout: 15000 });
   const id = new URL(sw.url()).host;
@@ -22,6 +34,11 @@ try {
   await panel.goto(`chrome-extension://${id}/side-panel.html`);
   await panel.waitForSelector('#improve:not([hidden])', { timeout: 5000 });
   log('panel opens on the Improve tab', (await panel.getAttribute('#tab-improve', 'aria-selected')) === 'true' && (await panel.textContent('#imp-help')).length > 20);
+  const trialStore = await panel.evaluate(() => chrome.storage.local.get('trial'));
+  log('fresh install starts the 7-day trial and the drawer shows the countdown', /^\d{4}-\d{2}-\d{2}T/.test(trialStore.trial?.startedAt || '') && (await panel.textContent('#pro-badge')).trim() === 'Trial · 7 days left' && !(await panel.isHidden('#trial-note')) && /Keep Pro for \$4\.99/.test(await panel.textContent('#trial-note')), JSON.stringify({ trial: trialStore.trial, badge: await panel.textContent('#pro-badge') }));
+  const overStatus = await panel.evaluate(async () => { const m = await import(chrome.runtime.getURL('lib/license.js')); const keep = (await chrome.storage.local.get('trial')).trial; await chrome.storage.local.set({ trial: { startedAt: new Date(Date.now() - 10 * 86400000).toISOString() } }); const s = await m.getProStatus(); await chrome.storage.local.set({ trial: keep }); return s; });
+  log('ended trial falls through to the test-build switch (source = test, trial over)', overStatus.pro === true && overStatus.source === 'test' && overStatus.trial.started && !overStatus.trial.active, JSON.stringify(overStatus));
+  await panel.waitForTimeout(300);
   await panel.fill('#imp-in', 'write an email to my landlord about the broken heater');
   await panel.click('#imp-go');
   await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
@@ -118,7 +135,13 @@ try {
   const settings = await opts.evaluate(() => chrome.storage.local.get('settings'));
   log('options persist settings', settings.settings.engine === 'inchat' && settings.settings.aboutMe === 'I am a tester.');
   const badge = await opts.textContent('#pro-badge');
-  log('test mode shows Pro', badge.trim() === 'Pro');
+  log('settings show the trial countdown and the Keep Pro price', badge.trim() === 'Trial · 7 days left' && /7 days left/.test(await opts.textContent('#trial-status')) && (await opts.textContent('#buy')).trim() === 'Keep Pro for $4.99', badge);
+  const snapshot = await opts.evaluate(() => chrome.storage.local.get(null));
+  opts.once('dialog', d => d.accept());
+  await opts.click('#wipe'); await opts.waitForTimeout(600);
+  const wiped = await opts.evaluate(() => chrome.storage.local.get(null));
+  log('deleting all data keeps the trial clock', wiped.trial?.startedAt === snapshot.trial?.startedAt && !wiped.prompts && !wiped.settings, JSON.stringify({ before: snapshot.trial, after: wiped.trial, keys: Object.keys(wiped) }));
+  await opts.evaluate(snap => chrome.storage.local.set(snap), snapshot); await opts.waitForTimeout(400);
   // --- end-to-end on routed fake chat hosts (real content script, real SW) ---
   const copilotHtml = `<!doctype html><html><body><textarea id="userInput" placeholder="Message Copilot"></textarea><button aria-label="Submit message" id="send">Send</button><script>window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});</script></body></html>`;
   const chatgptHtml = `<!doctype html><html><body><div id="prompt-textarea" class="ProseMirror" contenteditable="true"><p><br></p></div><button data-testid="send-button" id="send">Send</button><script>
@@ -240,6 +263,12 @@ try {
   await panel.waitForTimeout(1500);
   const raceOut = await panel.inputValue('#imp-out'); const raceEngine = await panel.inputValue('#imp-engine'); const raceBtn = await panel.textContent('#imp-go');
   log('late reply from an older engine is ignored (panel)', raceEngine === 'local' && /Context:/.test(raceOut) && !/better prompt|improve/i.test(raceOut.split('\n')[0]) && raceBtn.trim() === 'Improve', JSON.stringify({ raceEngine, first: raceOut.split('\n')[0], raceBtn }));
+  // --- 0.3.1: switching Prompt/Brief while an Improve is still running must hand the button back ---
+  await panel.selectOption('#imp-engine', 'inchat'); await panel.waitForTimeout(100); // the slow (900 ms) engine; state.improved is set so this starts a run
+  await panel.click('#imp-mode-brief'); await panel.waitForTimeout(100);
+  const stuckNow = await panel.isDisabled('#imp-go'); await panel.waitForTimeout(1200); const stuckLater = await panel.isDisabled('#imp-go');
+  log('mode switch mid-Improve re-enables the drawer button', !stuckNow && !stuckLater && (await panel.textContent('#imp-go')).trim() === 'Write the prompt' && (await panel.isHidden('#imp-result')), JSON.stringify({ stuckNow, stuckLater }));
+  await panel.click('#imp-mode-prompt'); await panel.waitForTimeout(200);
   // --- 0.3.0: Brief mode in the drawer (four boxes -> long CIDI prompt) ---
   await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'pd:improve', brief: { job: '   ' }, engine: 'local' })).then(r => log('brief without a job is refused', r?.ok === false && r.error === 'empty', JSON.stringify(r)));
   await panel.selectOption('#imp-engine', 'local'); await panel.waitForTimeout(200);
@@ -273,6 +302,31 @@ try {
   await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p><br></p>'; ed.focus(); });
   await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(400);
   log('empty chat box opens Improve on the Brief side', (await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.getAttribute("aria-pressed")')) === 'true' && (await inShadow(gpt, '#pd-brief', 'this.hidden')) === false && (await inShadow(gpt, '#pd-job', 'this.value')) === '');
+  const afterEmpty = (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings;
+  log('empty-box Brief does not overwrite the remembered Prompt side, and tipSeen survives', afterEmpty.improveMode === 'prompt' && afterEmpty.tipSeen === true, JSON.stringify({ improveMode: afterEmpty.improveMode, tipSeen: afterEmpty.tipSeen }));
+  await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(300);
+  log('clicking Brief in the dialog is remembered', (await panel.evaluate(() => chrome.storage.local.get('settings'))).settings.improveMode === 'brief');
+  await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
+  // --- 0.3.3: the Input line is a plain statement, and paste/copy/cut work inside the dialog even when the site hijacks clipboard events ---
+  await panel.evaluate(() => chrome.storage.local.get('settings').then(({ settings }) => chrome.storage.local.set({ settings: { ...settings, improveMode: 'prompt', engine: 'local' } }))); await gpt.waitForTimeout(200);
+  await gpt.evaluate(() => { const ed = document.getElementById('prompt-textarea'); ed.innerHTML = '<p>write a poem about cats</p>'; ed.focus(); });
+  await inShadow(gpt, '#improve', 'this.click(), true'); await gpt.waitForTimeout(400);
+  const inputLineOut = await inShadow(gpt, '#pd-out', 'this.value');
+  log('Input line is a statement the AI understands (no "(paste ...)" placeholder)', /\nInput: none provided\. Work from the details above\.$/.test(inputLineOut) && !/paste the text/.test(inputLineOut), JSON.stringify(inputLineOut.split('\n').slice(-2)));
+  log('dialog hint tells the person where to paste their material', /Paste it over the Input line/.test(await inShadow(gpt, '#pd-hint', 'this.textContent')));
+  await gpt.evaluate(() => { window.hijacked = 0; for (const t of ['paste', 'copy', 'cut']) document.addEventListener(t, (e) => { window.hijacked++; e.preventDefault(); }, true); });
+  await inShadow(gpt, '#pd-modes button[data-mode="brief"]', 'this.click(), true'); await gpt.waitForTimeout(200);
+  await inShadow(gpt, '#pd-job', 'this.value = "", true');
+  const pasted = await inShadow(gpt, '#pd-job', `(this.focus(), this.dispatchEvent(Object.assign(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', 'pasted from clipboard'); return d; })(), bubbles: true, composed: true, cancelable: true }), {})), this.value)`);
+  log('paste lands in the dialog box, not in the site composer', pasted === 'pasted from clipboard' && (await gpt.evaluate(() => window.hijacked)) === 0 && !(await gpt.evaluate(() => document.getElementById('prompt-textarea').innerText)).includes('pasted from'), JSON.stringify({ pasted, hijacked: await gpt.evaluate(() => window.hijacked) }));
+  const pastedTwice = await inShadow(gpt, '#pd-job', `(this.focus(), this.setSelectionRange(this.value.length, this.value.length), this.dispatchEvent(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', ' and more'); return d; })(), bubbles: true, composed: true, cancelable: true })), this.value)`);
+  log('a second paste appends at the caret', pastedTwice === 'pasted from clipboard and more', JSON.stringify(pastedTwice));
+  const copied = await inShadow(gpt, '#pd-job', `(() => { this.focus(); this.setSelectionRange(0, 6); const d = new DataTransfer(); this.dispatchEvent(new ClipboardEvent('copy', { clipboardData: d, bubbles: true, composed: true, cancelable: true })); return [d.getData('text/plain'), this.value]; })()`);
+  log('copy takes the selected text from the dialog box', copied?.[0] === 'pasted' && copied?.[1] === 'pasted from clipboard and more' && (await gpt.evaluate(() => window.hijacked)) === 0, JSON.stringify(copied));
+  const cutRes = await inShadow(gpt, '#pd-job', `(() => { this.focus(); this.setSelectionRange(0, 7); const d = new DataTransfer(); this.dispatchEvent(new ClipboardEvent('cut', { clipboardData: d, bubbles: true, composed: true, cancelable: true })); return [d.getData('text/plain'), this.value]; })()`);
+  log('cut removes the selected text and puts it on the clipboard', cutRes?.[0] === 'pasted ' && cutRes?.[1] === 'from clipboard and more' && (await gpt.evaluate(() => window.hijacked)) === 0, JSON.stringify(cutRes));
+  await gpt.evaluate(() => { document.getElementById('prompt-textarea').dispatchEvent(new ClipboardEvent('paste', { clipboardData: (() => { const d = new DataTransfer(); d.setData('text/plain', 'site paste'); return d; })(), bubbles: true, composed: true, cancelable: true })); });
+  log('a paste outside the dialog still reaches the site', (await gpt.evaluate(() => window.hijacked)) === 1);
   await gpt.keyboard.press('Escape'); await gpt.waitForTimeout(150);
   // real site mount check (network may block; informational)
   const real = await ctx.newPage();

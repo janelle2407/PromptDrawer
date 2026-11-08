@@ -1,7 +1,7 @@
-import { CHECKOUT_URL, HOMEPAGE, PRO_FEATURES, TEST_MODE_PRO } from './config.js';
+import { CHECKOUT_URL, HOMEPAGE, PRO_FEATURES, PRO_PRICE, TEST_MODE_PRO, TRIAL_DAYS } from './config.js';
 import { PROVIDER_LIST } from './lib/engines.js';
-import { activateLicense, isPro, removeLicense } from './lib/license.js';
-import { getByokKeys, getLicense, getSettings, setByokKey, updateSettings } from './lib/storage.js';
+import { activateLicense, getProStatus, isPro, removeLicense } from './lib/license.js';
+import { getByokKeys, getLicense, getSettings, getTrial, setByokKey, setTrial, updateSettings } from './lib/storage.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (sel, text, tone = '') => { const el = $(sel); el.textContent = text; el.dataset.tone = tone; };
@@ -9,9 +9,12 @@ let settings;
 
 async function load() {
   settings = await getSettings();
-  const pro = await isPro();
-  $('#pro-badge').textContent = pro ? 'Pro' : 'Free';
+  const { pro, source, trial } = await getProStatus();
+  $('#pro-badge').textContent = source === 'trial' ? `Trial · ${trial.daysLeft} ${trial.daysLeft === 1 ? 'day' : 'days'} left` : pro ? 'Pro' : 'Free';
   $('#pro-list').textContent = Object.values(PRO_FEATURES).join(', ');
+  $('#pro-price').textContent = PRO_PRICE; $('#trial-days').textContent = String(TRIAL_DAYS); $('#buy').textContent = `Keep Pro for ${PRO_PRICE}`;
+  const ends = trial.endsAt ? new Date(trial.endsAt).toLocaleDateString() : '';
+  show('#trial-status', source === 'license' ? '' : source === 'trial' ? `Your free Pro trial has ${trial.daysLeft} ${trial.daysLeft === 1 ? 'day' : 'days'} left (ends ${ends}).` : trial.started ? `Your free Pro trial ended on ${ends}. Keep Pro below, or carry on with the free plan.` : '', source === 'trial' ? 'ok' : '');
   $('#test-mode').hidden = !TEST_MODE_PRO;
   $('#homepage').href = HOMEPAGE;
   $('#showToolbar').checked = settings.showToolbar !== false;
@@ -84,7 +87,9 @@ $('#licenseRemove').addEventListener('click', async () => { await removeLicense(
 $('#buy').addEventListener('click', () => chrome.tabs.create({ url: CHECKOUT_URL }));
 $('#wipe').addEventListener('click', async () => {
   if (!confirm('Delete every prompt, setting and key stored by PromptDrawer on this device? Export first if you want a copy. This cannot be undone.')) return;
-  await chrome.storage.local.clear(); show('#wipe-result', 'Everything was deleted.', 'ok'); load();
+  const trial = await getTrial(); // deleting your data is not a way to restart the trial
+  await chrome.storage.local.clear(); if (trial.startedAt) await setTrial(trial);
+  show('#wipe-result', 'Everything was deleted.', 'ok'); load();
 });
 function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
 load();

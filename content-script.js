@@ -192,6 +192,49 @@
   const $ = (sel) => shadow.querySelector(sel);
   const layer = $('#layer');
 
+  // --- Clipboard bridge -----------------------------------------------------
+  // Chat sites install document-level paste/copy handlers. With focus inside
+  // our closed shadow root, document.activeElement is the host div, so the
+  // page treats a paste as "outside any input", preventDefaults it and routes
+  // the text into its own composer; our text box receives nothing. Catch the
+  // event first (window, capture phase), apply it to our field ourselves and
+  // stop the page from seeing it.
+  function activeField() {
+    const a = shadow.activeElement;
+    return a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') ? a : null;
+  }
+  function bridgeClipboard(event) {
+    if (!event.composedPath().includes(root)) return;
+    const field = activeField();
+    if (!field) return;
+    const data = event.clipboardData;
+    if (!data) return;
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? start;
+    if (event.type === 'paste') {
+      const text = data.getData('text/plain');
+      if (!text) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      field.focus();
+      let done = false;
+      try { done = document.execCommand('insertText', false, text); } catch { done = false; }
+      if (!done || !field.value.includes(text)) field.setRangeText(text, start, end, 'end');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    const selected = field.value.slice(start, end);
+    if (!selected) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    data.setData('text/plain', selected);
+    if (event.type === 'cut') {
+      field.setRangeText('', start, end, 'end');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  for (const type of ['paste', 'copy', 'cut']) window.addEventListener(type, bridgeClipboard, true);
+
   let toastTimer;
   function toast(text, { action, onAction, ms = 5000 } = {}) {
     clearToast();
@@ -279,7 +322,7 @@
     ['rules', 'Rules', 'e.g. last 6 months only; Australian market; no guesses'],
     ['done', 'Done looks like', 'e.g. one page, 8 competitors, a table with sources'],
   ];
-  const HINT_PROMPT = 'You can edit the result. Nothing changes in the chat box until you press Use this.';
+  const HINT_PROMPT = 'You can edit the result. Have text or data for the AI? Paste it over the Input line. Nothing changes in the chat box until you press Use this.';
   const HINT_INCHAT = 'This is a message asking the AI to improve your request. Press Use this, then Enter, and copy what the AI replies.';
   const HINT_BRIEF = 'Fill in the four boxes (short is fine), then press Write the prompt. Only the job is required.';
   async function openImprove(prefill, startMode) {
@@ -330,14 +373,14 @@
     const q = sel => card.querySelector(sel);
     const readBrief = () => Object.fromEntries(BRIEF_FIELDS.map(([key]) => [key, q('#pd-' + key).value]));
     // Switches between the one-line Prompt side and the four-box Brief side. Remembered for next time.
-    function setMode(next) {
+    function setMode(next, { remember = true } = {}) {
       mode = next; gen++; current = null;
       card.querySelectorAll('#pd-modes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === next)));
       q('#pd-brief').hidden = next !== 'brief';
       q('#pd-toggle-wrap').hidden = next === 'brief';
       q('#pd-toggle').checked = false; q('#pd-diff').hidden = true; q('#pd-out').hidden = false; q('#pd-note').hidden = true;
       q('#pd-use').disabled = true; q('#pd-save-improved').disabled = true;
-      chrome.storage.local.get({ settings: {} }).then(({ settings }) => chrome.storage.local.set({ settings: { ...(settings || {}), improveMode: next } })).catch(() => {});
+      if (remember) patchSettings({ improveMode: next }); // only a click on Prompt/Brief is remembered; an empty chat box opening on Brief is not a choice
       if (next === 'brief') { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Your long, detailed prompt appears here.'; q('#pd-hint').textContent = HINT_BRIEF; (q('#pd-job').value ? q('#pd-why') : q('#pd-job')).focus(); }
       else if (rough) { q('#pd-hint').textContent = HINT_PROMPT; run(); }
       else { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Type something in the chat box first, or switch to Brief.'; q('#pd-hint').textContent = 'Nothing is typed in the chat box yet. Close this, type a rough request, then press Improve again.'; }
@@ -366,7 +409,7 @@
       if (pressed && pressed.dataset.engine !== result.engine) { card.querySelectorAll('.seg button[data-engine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === result.engine))); q('#pd-engine-help').textContent = ENGINE_HELP[result.engine]; }
       use.disabled = false; save.disabled = false; use.focus();
     };
-    setMode(mode);
+    setMode(mode, { remember: false });
     markTipSeen();
   }
 
@@ -412,10 +455,21 @@
     if (key === 's') openSave(); else if (key === 'i') openImprove(); else send({ type: 'pd:open-panel' });
   }, true);
 
+  // Settings patches from this page go through one queue, so two read-modify-writes (say tipSeen and improveMode on the first Improve) cannot overwrite each other.
+  let settingsWrite = Promise.resolve();
+  function patchSettings(patch) {
+    settingsWrite = settingsWrite.then(async () => {
+      const { settings } = await chrome.storage.local.get({ settings: {} });
+      const current = settings || {};
+      if (Object.keys(patch).every(k => current[k] === patch[k])) return;
+      await chrome.storage.local.set({ settings: { ...current, ...patch } });
+    }).catch(() => { /* ignore */ });
+    return settingsWrite;
+  }
   // First-run tip next to the pill, until Improve has been used once (or dismissed).
   async function markTipSeen() {
     $('#tip').hidden = true;
-    try { const { settings } = await chrome.storage.local.get({ settings: {} }); if (!settings?.tipSeen) await chrome.storage.local.set({ settings: { ...(settings || {}), tipSeen: true } }); } catch { /* ignore */ }
+    await patchSettings({ tipSeen: true });
   }
   $('#tip-ok').addEventListener('click', markTipSeen);
   // Toolbar visibility follows the setting.
