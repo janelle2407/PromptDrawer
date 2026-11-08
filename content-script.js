@@ -330,14 +330,14 @@
     const q = sel => card.querySelector(sel);
     const readBrief = () => Object.fromEntries(BRIEF_FIELDS.map(([key]) => [key, q('#pd-' + key).value]));
     // Switches between the one-line Prompt side and the four-box Brief side. Remembered for next time.
-    function setMode(next) {
+    function setMode(next, { remember = true } = {}) {
       mode = next; gen++; current = null;
       card.querySelectorAll('#pd-modes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === next)));
       q('#pd-brief').hidden = next !== 'brief';
       q('#pd-toggle-wrap').hidden = next === 'brief';
       q('#pd-toggle').checked = false; q('#pd-diff').hidden = true; q('#pd-out').hidden = false; q('#pd-note').hidden = true;
       q('#pd-use').disabled = true; q('#pd-save-improved').disabled = true;
-      chrome.storage.local.get({ settings: {} }).then(({ settings }) => chrome.storage.local.set({ settings: { ...(settings || {}), improveMode: next } })).catch(() => {});
+      if (remember) patchSettings({ improveMode: next }); // only a click on Prompt/Brief is remembered; an empty chat box opening on Brief is not a choice
       if (next === 'brief') { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Your long, detailed prompt appears here.'; q('#pd-hint').textContent = HINT_BRIEF; (q('#pd-job').value ? q('#pd-why') : q('#pd-job')).focus(); }
       else if (rough) { q('#pd-hint').textContent = HINT_PROMPT; run(); }
       else { q('#pd-out').value = ''; q('#pd-out').placeholder = 'Type something in the chat box first, or switch to Brief.'; q('#pd-hint').textContent = 'Nothing is typed in the chat box yet. Close this, type a rough request, then press Improve again.'; }
@@ -366,7 +366,7 @@
       if (pressed && pressed.dataset.engine !== result.engine) { card.querySelectorAll('.seg button[data-engine]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === result.engine))); q('#pd-engine-help').textContent = ENGINE_HELP[result.engine]; }
       use.disabled = false; save.disabled = false; use.focus();
     };
-    setMode(mode);
+    setMode(mode, { remember: false });
     markTipSeen();
   }
 
@@ -412,10 +412,21 @@
     if (key === 's') openSave(); else if (key === 'i') openImprove(); else send({ type: 'pd:open-panel' });
   }, true);
 
+  // Settings patches from this page go through one queue, so two read-modify-writes (say tipSeen and improveMode on the first Improve) cannot overwrite each other.
+  let settingsWrite = Promise.resolve();
+  function patchSettings(patch) {
+    settingsWrite = settingsWrite.then(async () => {
+      const { settings } = await chrome.storage.local.get({ settings: {} });
+      const current = settings || {};
+      if (Object.keys(patch).every(k => current[k] === patch[k])) return;
+      await chrome.storage.local.set({ settings: { ...current, ...patch } });
+    }).catch(() => { /* ignore */ });
+    return settingsWrite;
+  }
   // First-run tip next to the pill, until Improve has been used once (or dismissed).
   async function markTipSeen() {
     $('#tip').hidden = true;
-    try { const { settings } = await chrome.storage.local.get({ settings: {} }); if (!settings?.tipSeen) await chrome.storage.local.set({ settings: { ...(settings || {}), tipSeen: true } }); } catch { /* ignore */ }
+    await patchSettings({ tipSeen: true });
   }
   $('#tip-ok').addEventListener('click', markTipSeen);
   // Toolbar visibility follows the setting.
