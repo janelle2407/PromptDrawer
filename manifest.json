@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PromptDrawer",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Your prompts, in every AI. Save and reuse prompts, tidy a quick prompt, or brief the AI on a bigger job. Stored on your device.",
   "minimum_chrome_version": "116",
   "permissions": [

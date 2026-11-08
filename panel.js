@@ -1,12 +1,12 @@
 // PromptDrawer side panel: the library.
-import { CHECKOUT_URL, FREE_LIMITS, LIMITS, PRO_FEATURES } from './config.js';
-import { isPro } from './lib/license.js';
+import { CHECKOUT_URL, FREE_LIMITS, LIMITS, PRO_FEATURES, PRO_PRICE, TRIAL_DAYS } from './config.js';
+import { getProStatus } from './lib/license.js';
 import { STARTER_PACKS } from './lib/packs.js';
 import { SPECIAL_VARIABLES, deletePrompt, deleteProject, fillVariables, findVariables, getProjects, getPrompts, getSettings, importProjects, importPrompts, projectBrief, savePrompt, saveProject, toMarkdown, uid, updateSettings } from './lib/storage.js';
 import { ENGINE_HELP } from './lib/improver.js';
 
 const $ = (sel) => document.querySelector(sel);
-const state = { prompts: [], projects: [], settings: {}, pro: false, folder: 'all', query: '', editing: null, editingProject: null, tab: 'improve', improved: null };
+const state = { prompts: [], projects: [], settings: {}, pro: false, proStatus: null, folder: 'all', query: '', editing: null, editingProject: null, tab: 'improve', improved: null };
 const activeProject = () => state.projects.find(p => p.id === state.settings.activeProject) || null;
 
 const report = (text, tone = '') => { const s = $('#status'); s.textContent = text; s.dataset.tone = tone; if (text) setTimeout(() => { if (s.textContent === text) { s.textContent = ''; s.dataset.tone = ''; } }, 6000); };
@@ -15,10 +15,11 @@ const send = async (message) => { try { return await chrome.runtime.sendMessage(
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function load() {
-  [state.prompts, state.projects, state.settings, state.pro] = await Promise.all([getPrompts(), getProjects(), getSettings(), isPro()]);
+  [state.prompts, state.projects, state.settings, state.proStatus] = await Promise.all([getPrompts(), getProjects(), getSettings(), getProStatus()]);
+  state.pro = state.proStatus.pro;
   applyTheme();
   renderProjectBar();
-  $('#pro-badge').textContent = state.pro ? 'Pro' : 'Free';
+  renderProBadge();
   if (!state.loaded) {
     state.loaded = true;
     let tab = 'improve'; try { tab = localStorage.getItem('pd-tab') || 'improve'; } catch { /* ignore */ }
@@ -174,11 +175,30 @@ async function askAll(presetText) {
   });
 }
 
+// Badge under the name plus the one-line trial note under the header.
+function renderProBadge() {
+  const { source, trial } = state.proStatus;
+  const days = trial.daysLeft;
+  $('#pro-badge').textContent = source === 'trial' ? `Trial · ${days} ${days === 1 ? 'day' : 'days'} left` : state.pro ? 'Pro' : 'Free';
+  const note = $('#trial-note'); note.textContent = ''; note.hidden = true;
+  const keep = () => chrome.tabs.create({ url: CHECKOUT_URL });
+  if (source === 'trial') {
+    note.append(`Every Pro feature is free for ${days} more ${days === 1 ? 'day' : 'days'}. `, button(`Keep Pro for ${PRO_PRICE}`, keep, 'link'));
+    note.hidden = false;
+  } else if (source === 'none' && trial.started && !state.settings.trialNoteDismissed) {
+    note.append(`Your free ${TRIAL_DAYS}-day Pro trial has ended. Everything you saved is still here. `, button(`Keep Pro for ${PRO_PRICE}`, keep, 'link'), ' ', button('Hide', () => updateSettings({ trialNoteDismissed: true }), 'link'));
+    note.hidden = false;
+  }
+}
+
 function upsell(feature) {
   modal('Pro feature', box => {
-    const p = document.createElement('p'); p.textContent = `${feature} is part of PromptDrawer Pro: a one-time purchase, no subscription, 7-day refund if it is not for you.`; box.append(p);
+    const ended = state.proStatus?.trial?.started && !state.proStatus.trial.active;
+    const p = document.createElement('p');
+    p.textContent = (ended ? `Your free ${TRIAL_DAYS}-day Pro trial has ended. ` : '') + `${feature} is part of PromptDrawer Pro: one-time ${PRO_PRICE}, no subscription, 7-day refund if it is not for you.`;
+    box.append(p);
     const actions = document.createElement('div'); actions.className = 'actions';
-    actions.append(button('Not now', closeModal), spacer(), button('Get Pro', () => chrome.tabs.create({ url: CHECKOUT_URL }), 'primary'), button('I have a key', () => chrome.runtime.openOptionsPage()));
+    actions.append(button('Not now', closeModal), spacer(), button(`Keep Pro for ${PRO_PRICE}`, () => chrome.tabs.create({ url: CHECKOUT_URL }), 'primary'), button('I have a key', () => chrome.runtime.openOptionsPage()));
     box.append(actions);
   });
 }
@@ -420,5 +440,5 @@ function closeModal() { $('#modal-root').replaceChildren(); }
 function button(text, onClick, cls = '') { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; if (cls) b.className = cls; b.addEventListener('click', onClick); return b; }
 function spacer() { const s = document.createElement('span'); s.className = 'spacer'; return s; }
 
-chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && (changes.prompts || changes.projects || changes.settings || changes.license)) load(); });
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && (changes.prompts || changes.projects || changes.settings || changes.license || changes.trial)) load(); });
 load();

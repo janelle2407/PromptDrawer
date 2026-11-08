@@ -1,6 +1,7 @@
 import pw from '/opt/node-tools/node_modules/playwright/index.js'; const { chromium } = pw;
 import fs from 'node:fs';
 import { splitRules } from '../lib/improver.js';
+import { trialStatus } from '../lib/license.js';
 const EXT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const userData = '/tmp/claude-0/-home-user/e3bcbd6b-ae7f-5919-a1b3-1c00faf18e9d/scratchpad/pdtest/profile';
 fs.rmSync(userData, { recursive: true, force: true });
@@ -14,6 +15,13 @@ try {
   // --- 0.3.1: list markers are stripped from rules, numbers that belong to the rule are kept ---
   const rulesOut = splitRules('10 pages max; 1. cite sources\n- no guesses; 3.5 hours max; 2) Australian market');
   log('rule splitter keeps leading numbers, drops list markers', JSON.stringify(rulesOut) === JSON.stringify(['10 pages max', 'cite sources', 'no guesses', '3.5 hours max', 'Australian market']), JSON.stringify(rulesOut));
+  // --- 0.3.2: the free Pro trial clock (pure function, no browser needed) ---
+  const DAY = 86400000, now = Date.now();
+  const tFresh = trialStatus({ startedAt: new Date(now).toISOString() }, now);
+  const tLate = trialStatus({ startedAt: new Date(now - 6.5 * DAY).toISOString() }, now);
+  const tOver = trialStatus({ startedAt: new Date(now - 8 * DAY).toISOString() }, now);
+  const tNone = trialStatus({ startedAt: '' }, now);
+  log('trial clock: fresh = 7 days, day 6.5 = 1 day, day 8 = over, unset = not started', tFresh.active && tFresh.daysLeft === 7 && tLate.active && tLate.daysLeft === 1 && !tOver.active && tOver.daysLeft === 0 && tOver.started && !tNone.started && !tNone.active, JSON.stringify({ tFresh, tLate, tOver, tNone }));
   let [sw] = ctx.serviceWorkers();
   if (!sw) sw = await ctx.waitForEvent('serviceworker', { timeout: 15000 });
   const id = new URL(sw.url()).host;
@@ -26,6 +34,11 @@ try {
   await panel.goto(`chrome-extension://${id}/side-panel.html`);
   await panel.waitForSelector('#improve:not([hidden])', { timeout: 5000 });
   log('panel opens on the Improve tab', (await panel.getAttribute('#tab-improve', 'aria-selected')) === 'true' && (await panel.textContent('#imp-help')).length > 20);
+  const trialStore = await panel.evaluate(() => chrome.storage.local.get('trial'));
+  log('fresh install starts the 7-day trial and the drawer shows the countdown', /^\d{4}-\d{2}-\d{2}T/.test(trialStore.trial?.startedAt || '') && (await panel.textContent('#pro-badge')).trim() === 'Trial · 7 days left' && !(await panel.isHidden('#trial-note')) && /Keep Pro for \$4\.99/.test(await panel.textContent('#trial-note')), JSON.stringify({ trial: trialStore.trial, badge: await panel.textContent('#pro-badge') }));
+  const overStatus = await panel.evaluate(async () => { const m = await import(chrome.runtime.getURL('lib/license.js')); const keep = (await chrome.storage.local.get('trial')).trial; await chrome.storage.local.set({ trial: { startedAt: new Date(Date.now() - 10 * 86400000).toISOString() } }); const s = await m.getProStatus(); await chrome.storage.local.set({ trial: keep }); return s; });
+  log('ended trial falls through to the test-build switch (source = test, trial over)', overStatus.pro === true && overStatus.source === 'test' && overStatus.trial.started && !overStatus.trial.active, JSON.stringify(overStatus));
+  await panel.waitForTimeout(300);
   await panel.fill('#imp-in', 'write an email to my landlord about the broken heater');
   await panel.click('#imp-go');
   await panel.waitForSelector('#imp-result:not([hidden])', { timeout: 5000 });
@@ -122,7 +135,13 @@ try {
   const settings = await opts.evaluate(() => chrome.storage.local.get('settings'));
   log('options persist settings', settings.settings.engine === 'inchat' && settings.settings.aboutMe === 'I am a tester.');
   const badge = await opts.textContent('#pro-badge');
-  log('test mode shows Pro', badge.trim() === 'Pro');
+  log('settings show the trial countdown and the Keep Pro price', badge.trim() === 'Trial · 7 days left' && /7 days left/.test(await opts.textContent('#trial-status')) && (await opts.textContent('#buy')).trim() === 'Keep Pro for $4.99', badge);
+  const snapshot = await opts.evaluate(() => chrome.storage.local.get(null));
+  opts.once('dialog', d => d.accept());
+  await opts.click('#wipe'); await opts.waitForTimeout(600);
+  const wiped = await opts.evaluate(() => chrome.storage.local.get(null));
+  log('deleting all data keeps the trial clock', wiped.trial?.startedAt === snapshot.trial?.startedAt && !wiped.prompts && !wiped.settings, JSON.stringify({ before: snapshot.trial, after: wiped.trial, keys: Object.keys(wiped) }));
+  await opts.evaluate(snap => chrome.storage.local.set(snap), snapshot); await opts.waitForTimeout(400);
   // --- end-to-end on routed fake chat hosts (real content script, real SW) ---
   const copilotHtml = `<!doctype html><html><body><textarea id="userInput" placeholder="Message Copilot"></textarea><button aria-label="Submit message" id="send">Send</button><script>window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});</script></body></html>`;
   const chatgptHtml = `<!doctype html><html><body><div id="prompt-textarea" class="ProseMirror" contenteditable="true"><p><br></p></div><button data-testid="send-button" id="send">Send</button><script>
