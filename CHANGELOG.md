@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 (2026-11-07)
+
+Two fixes from testing: paste works inside the Improve dialog, and the Input line no longer confuses the AI.
+- **Paste, copy and cut work in the dialog.** Chat sites catch every paste on the page and push it into their own composer, so pasting into the Improve dialog did nothing. The extension now catches paste, copy and cut for its own text boxes first and applies them itself. Pasting elsewhere on the page is untouched.
+- **Clearer Input line.** The improved prompt used to end with "(paste the text, notes or data to work from here, if any)", which AIs read as a question or a form to fill. It now ends with "Input: none provided. Work from the details above." The "Ask this AI" meta prompts ask for the same line when there is nothing to work from.
+- **Hints.** The dialog and the drawer now say: "Have text or data for the AI? Paste it over the Input line."
+- Tests: 7 new headless checks (74 total), including a hostile page-level paste handler that must never see a paste meant for the dialog.
+
 ## 0.3.2 (2026-11-07)
 
 Pricing: one-time $4.99, with a free 7-day Pro trial on every install. No card, no account.

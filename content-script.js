@@ -192,6 +192,49 @@
   const $ = (sel) => shadow.querySelector(sel);
   const layer = $('#layer');
 
+  // --- Clipboard bridge -----------------------------------------------------
+  // Chat sites install document-level paste/copy handlers. With focus inside
+  // our closed shadow root, document.activeElement is the host div, so the
+  // page treats a paste as "outside any input", preventDefaults it and routes
+  // the text into its own composer; our text box receives nothing. Catch the
+  // event first (window, capture phase), apply it to our field ourselves and
+  // stop the page from seeing it.
+  function activeField() {
+    const a = shadow.activeElement;
+    return a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') ? a : null;
+  }
+  function bridgeClipboard(event) {
+    if (!event.composedPath().includes(root)) return;
+    const field = activeField();
+    if (!field) return;
+    const data = event.clipboardData;
+    if (!data) return;
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? start;
+    if (event.type === 'paste') {
+      const text = data.getData('text/plain');
+      if (!text) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      field.focus();
+      let done = false;
+      try { done = document.execCommand('insertText', false, text); } catch { done = false; }
+      if (!done || !field.value.includes(text)) field.setRangeText(text, start, end, 'end');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    const selected = field.value.slice(start, end);
+    if (!selected) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    data.setData('text/plain', selected);
+    if (event.type === 'cut') {
+      field.setRangeText('', start, end, 'end');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  for (const type of ['paste', 'copy', 'cut']) window.addEventListener(type, bridgeClipboard, true);
+
   let toastTimer;
   function toast(text, { action, onAction, ms = 5000 } = {}) {
     clearToast();
@@ -279,7 +322,7 @@
     ['rules', 'Rules', 'e.g. last 6 months only; Australian market; no guesses'],
     ['done', 'Done looks like', 'e.g. one page, 8 competitors, a table with sources'],
   ];
-  const HINT_PROMPT = 'You can edit the result. Nothing changes in the chat box until you press Use this.';
+  const HINT_PROMPT = 'You can edit the result. Have text or data for the AI? Paste it over the Input line. Nothing changes in the chat box until you press Use this.';
   const HINT_INCHAT = 'This is a message asking the AI to improve your request. Press Use this, then Enter, and copy what the AI replies.';
   const HINT_BRIEF = 'Fill in the four boxes (short is fine), then press Write the prompt. Only the job is required.';
   async function openImprove(prefill, startMode) {
