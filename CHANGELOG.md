@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Prompt-quality eval (`test/prompt-eval.mjs`): 35 labelled fixtures with golden snapshots. 0.3.0 baseline: 1/35 pass; every miss is the always-on clarifying line (26) or a one-size-fits-all prompt that is too long for a small job (15). Facts are never dropped and nothing is invented. 0.4.0 must bring this to 35/35.
+
 ## 0.3.3 (2026-11-07)
 
 Two fixes from testing: paste works inside the Improve dialog, and the Input line no longer confuses the AI.

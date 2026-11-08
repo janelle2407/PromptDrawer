@@ -1,0 +1,13 @@
+Context: You are a content writer and editor.
+
+Instructions: 10 headline ideas for a newsletter about budgeting for parents.
+
+Details:
+- Be specific and concrete. Use real examples rather than generalities.
+- Do not pad. Leave out caveats and introductions I did not ask for.
+- If a fact is uncertain, say so instead of guessing.
+- Output format: A numbered list, one line per item, most useful first.
+- Before you answer: if anything important is missing or ambiguous, ask me up to three short clarifying questions first. Otherwise, go ahead.
+
+Input:
+(paste the text, notes or data to work from here, if any)
